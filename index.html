@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>One More Night</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23090b0d'/%3E%3Crect x='11' y='6' width='10' height='20' fill='%23161a1f' stroke='%232b3138'/%3E%3Ccircle cx='19' cy='16' r='1.2' fill='%23d8b26a'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="./src/ui/style.css" />
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js" } }
+</script>
+</head>
+<body>
+
+<canvas id="viewport"></canvas>
+
+<!-- ══════════════════ IN-GAME HUD ══════════════════ -->
+<div id="hud" class="hidden">
+  <div id="crosshair"><span></span></div>
+
+  <div id="prompt" class="hidden">
+    <span class="key">E</span><span class="label">Open</span>
+  </div>
+
+  <div id="watch" class="hidden">
+    <div class="watch-face">
+      <div class="watch-ring"></div>
+      <div class="watch-time">--:--</div>
+      <div class="watch-label">NIGHT <span id="watch-night">1</span></div>
+    </div>
+  </div>
+
+  <div id="torch">
+    <div class="torch-icon">
+      <svg viewBox="0 0 24 24" width="18" height="18"><path d="M8 2h8v4l-2 3v11a2 2 0 0 1-4 0V9L8 6z" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
+    </div>
+    <div class="torch-bar"><i></i></div>
+  </div>
+
+  <div id="vitals">
+    <div class="vital" id="vital-health"><span class="v-ico">✚</span><i></i></div>
+    <div class="vital" id="vital-food"><span class="v-ico">◗</span><i></i></div>
+  </div>
+
+  <div id="subtitle" class="hidden"></div>
+  <div id="toasts"></div>
+  <div id="whisper"></div>
+  <div id="damage-flash"></div>
+</div>
+
+<!-- ══════════════════ DIALOGUE ══════════════════ -->
+<div id="dialogue" class="overlay hidden">
+  <div class="dlg-wrap">
+    <div class="dlg-speaker"><span id="dlg-name">—</span><span id="dlg-trust" class="trust"></span></div>
+    <div class="dlg-text" id="dlg-text"></div>
+    <div class="dlg-options" id="dlg-options"></div>
+  </div>
+</div>
+
+<!-- ══════════════════ INVENTORY ══════════════════ -->
+<div id="inventory" class="overlay panel-overlay hidden">
+  <div class="panel">
+    <header><h2>Inventory</h2><span class="hint">TAB to close &nbsp;·&nbsp; click to select &nbsp;·&nbsp; drag one item onto another to combine</span></header>
+    <div class="panel-body inv-body">
+      <div class="inv-grid" id="inv-grid"></div>
+      <aside class="inv-detail" id="inv-detail">
+        <div class="empty">Nothing selected.</div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ JOURNAL ══════════════════ -->
+<div id="journal" class="overlay panel-overlay hidden">
+  <div class="panel journal-panel">
+    <header><h2>Journal</h2><span class="hint">J to close</span></header>
+    <nav class="jr-tabs" id="jr-tabs"></nav>
+    <div class="panel-body jr-body">
+      <div class="jr-list" id="jr-list"></div>
+      <div class="jr-detail" id="jr-detail"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ READABLE (notes, papers, photos) ══════════════════ -->
+<div id="reader" class="overlay hidden">
+  <div class="reader-sheet" id="reader-sheet">
+    <h3 id="reader-title"></h3>
+    <div id="reader-body"></div>
+    <div class="reader-foot">ESC / E to put it back</div>
+  </div>
+</div>
+
+<!-- ══════════════════ PAUSE ══════════════════ -->
+<div id="pause" class="overlay menu-overlay hidden">
+  <div class="menu">
+    <h1 class="m-title">Paused</h1>
+    <button data-act="resume">Resume</button>
+    <button data-act="settings">Settings</button>
+    <button data-act="save">Save &amp; Continue</button>
+    <button data-act="quit">Abandon Night</button>
+  </div>
+</div>
+
+<!-- ══════════════════ SETTINGS ══════════════════ -->
+<div id="settings" class="overlay menu-overlay hidden">
+  <div class="menu wide">
+    <h1 class="m-title">Settings</h1>
+    <div class="set-row"><label>Mouse sensitivity</label><input type="range" id="set-sens" min="0.2" max="3" step="0.05"><span class="val" id="val-sens"></span></div>
+    <div class="set-row"><label>Field of view</label><input type="range" id="set-fov" min="60" max="100" step="1"><span class="val" id="val-fov"></span></div>
+    <div class="set-row"><label>Master volume</label><input type="range" id="set-vol" min="0" max="1" step="0.02"><span class="val" id="val-vol"></span></div>
+    <div class="set-row"><label>Brightness</label><input type="range" id="set-bright" min="0.5" max="1.8" step="0.02"><span class="val" id="val-bright"></span></div>
+    <div class="set-row"><label>Render quality</label><select id="set-quality"><option value="0.7">Low</option><option value="0.85">Medium</option><option value="1">High</option></select><span class="val"></span></div>
+    <div class="set-row"><label>Head bob</label><input type="range" id="set-bob" min="0" max="1.5" step="0.05"><span class="val" id="val-bob"></span></div>
+    <div class="set-row"><label>Film grain</label><input type="range" id="set-grain" min="0" max="2" step="0.05"><span class="val" id="val-grain"></span></div>
+    <div class="set-row"><label>Invert mouse Y</label><input type="checkbox" id="set-invert"><span class="val"></span></div>
+    <div class="set-row"><label>Subtitles for sounds</label><input type="checkbox" id="set-subs"><span class="val"></span></div>
+    <div class="set-row"><label>Reduce flashing</label><input type="checkbox" id="set-flash"><span class="val"></span></div>
+    <button data-act="back" class="mt">Back</button>
+  </div>
+</div>
+
+<!-- ══════════════════ MAIN MENU ══════════════════ -->
+<div id="mainmenu" class="overlay menu-overlay">
+  <div class="mm-bg"></div>
+  <div class="mm-inner">
+    <div class="mm-title">
+      <h1>ONE<span>MORE</span>NIGHT</h1>
+      <p class="mm-sub">Ten minutes. One building. It is not the same as it was.</p>
+    </div>
+    <div class="menu bare">
+      <button data-act="continue" id="btn-continue">Continue</button>
+      <button data-act="new">New Game</button>
+      <button data-act="settings">Settings</button>
+      <button data-act="credits">About</button>
+    </div>
+    <div class="mm-foot"><span id="mm-save-info"></span></div>
+  </div>
+</div>
+
+<!-- ══════════════════ CREDITS / ABOUT ══════════════════ -->
+<div id="credits" class="overlay menu-overlay hidden">
+  <div class="menu wide scroll">
+    <h1 class="m-title">About</h1>
+    <div class="prose">
+      <p><b>One More Night</b> is a first-person survival mystery set in a decaying European apartment block during a citywide blackout.</p>
+      <p>Every night you have <b>ten minutes</b> outside your own door. Use them. Then come back, write down what you saw, and sleep.</p>
+      <p>The building will not wait for you to be ready.</p>
+      <h3>Controls</h3>
+      <ul class="keys">
+        <li><b>W A S D</b> move</li><li><b>Mouse</b> look</li><li><b>Shift</b> sprint</li>
+        <li><b>E</b> interact</li><li><b>F</b> flashlight</li><li><b>Tab</b> inventory</li>
+        <li><b>J</b> journal</li><li><b>Esc</b> pause</li><li><b>Q</b> lean / peek</li>
+        <li><b>C</b> crouch</li><li><b>1-9</b> dialogue choices</li>
+      </ul>
+      <h3>Advice</h3>
+      <ul class="keys">
+        <li>Lights are not decoration. They are the safest thing in the building.</li>
+        <li>The watch on your wrist is the only clock you can trust. Mostly.</li>
+        <li>Write things down. You will forget. That is part of it.</li>
+        <li>Some clues will not make sense for three more nights.</li>
+      </ul>
+      <p class="dim">Built with three.js. All geometry, textures and sound generated procedurally at runtime — no external assets.</p>
+    </div>
+    <button data-act="back" class="mt">Back</button>
+  </div>
+</div>
+
+<!-- ══════════════════ NIGHT CARD (intro / outro) ══════════════════ -->
+<div id="nightcard" class="overlay hidden">
+  <div class="nc-inner">
+    <div class="nc-eyebrow" id="nc-eyebrow">NIGHT ONE</div>
+    <h1 class="nc-title" id="nc-title">Normal</h1>
+    <p class="nc-text" id="nc-text"></p>
+    <button id="nc-btn">Leave the apartment</button>
+  </div>
+</div>
+
+<!-- ══════════════════ SLEEP / SUMMARY ══════════════════ -->
+<div id="summary" class="overlay hidden">
+  <div class="sum-inner">
+    <h1 id="sum-title">Night 1</h1>
+    <div class="sum-cols">
+      <div><h4>Found</h4><ul id="sum-found"></ul></div>
+      <div><h4>Noticed</h4><ul id="sum-noticed"></ul></div>
+      <div><h4>People</h4><ul id="sum-people"></ul></div>
+    </div>
+    <div class="sum-note">
+      <label>Write in your journal before you sleep</label>
+      <textarea id="sum-note" rows="3" maxlength="400" placeholder="What do you remember? What felt wrong?"></textarea>
+    </div>
+    <button id="sum-btn">Sleep</button>
+  </div>
+</div>
+
+<!-- ══════════════════ ENDING ══════════════════ -->
+<div id="ending" class="overlay hidden">
+  <div class="end-inner">
+    <div class="end-eyebrow">ENDING</div>
+    <h1 id="end-title"></h1>
+    <div id="end-body"></div>
+    <div id="end-stats"></div>
+    <div class="end-actions">
+      <button id="end-again">Begin again</button>
+      <button id="end-menu">Main menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ DEATH ══════════════════ -->
+<div id="gameover" class="overlay hidden">
+  <div class="go-inner">
+    <h1>YOU DID NOT COME BACK</h1>
+    <p id="go-text"></p>
+    <div class="end-actions">
+      <button id="go-retry">Wake up</button>
+      <button id="go-menu">Main menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ LOADING ══════════════════ -->
+<div id="loading" class="overlay hidden">
+  <div class="load-inner">
+    <div class="load-bar"><i id="load-fill"></i></div>
+    <div class="load-text" id="load-text">Rebuilding the building…</div>
+  </div>
+</div>
+
+<div id="blackout"></div>
+<div id="unsupported" class="overlay hidden"><div class="menu"><h1 class="m-title">WebGL unavailable</h1><p class="prose">This game needs WebGL2. Try a recent desktop browser with hardware acceleration enabled.</p></div></div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
