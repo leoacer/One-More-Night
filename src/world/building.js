@@ -811,19 +811,20 @@ export class Building {
     const brick = MAT.brick([3, 6]);
     // Distant blocks are unlit silhouettes — there is no light out there to
     // catch them, and a shape against the sky is all you would see anyway.
-    const far1 = new THREE.MeshBasicMaterial({ color: 0x0a0f15 });
-    const far2 = new THREE.MeshBasicMaterial({ color: 0x0d131a });
+    const far1 = new THREE.MeshBasicMaterial({ color: 0x0e151f });
+    const far2 = new THREE.MeshBasicMaterial({ color: 0x121a26 });
 
     // street
-    const street = P.box(220, 0.4, 220, MAT.flat(0x0a0d10, 0.72, 0.02), 0, -1.0, 0);
+    const street = new THREE.Mesh(new THREE.BoxGeometry(220, 0.4, 220),
+      new THREE.MeshBasicMaterial({ color: 0x0b1017 }));
+    street.position.set(0, -1.0, 0);
     g.add(street);
 
-    // our own facade, seen from the roof and reflected in the dark
-    for (const [x, z, w, d] of [[0, GEO.N_Z1 + 0.35, 20.4, 0.5], [0, GEO.S_Z0 - 0.35, 20.4, 0.5],
-      [-10.35, 0, 0.5, 17], [10.35, 0, 0.5, 17]]) {
-      const f = P.box(w, GEO.FLOOR_H * 5 + 2, d, brick, x, levelY(-1) - 0.5 + (GEO.FLOOR_H * 5 + 2) / 2, z);
-      g.add(f);
-    }
+    // No outer skin on our own building: the interior walls already are the
+    // facade, and a skin here would seal every window from the outside.
+    // A plinth at street level is enough to stop the block floating.
+    const plinth = P.box(21.6, 1.6, 18.0, brick, 0, levelY(-1) - 1.3, 0);
+    g.add(plinth);
 
     // the rest of the block: dark towers with a scattering of lit windows
     const lit = [];
@@ -838,7 +839,7 @@ export class Building {
       b.matrixAutoUpdate = false; b.updateMatrix();
       g.add(b);
       // a handful of windows still have power
-      if (rng.chance(0.34)) {
+      if (rng.chance(0.46)) {
         const n = rng.int(1, 3);
         for (let k = 0; k < n; k++) {
           const wy = rng.range(4, h - 2);
@@ -859,7 +860,7 @@ export class Building {
     // sky dome — a very dark, faintly stormy vault
     const sky = new THREE.Mesh(
       new THREE.SphereGeometry(180, 24, 16),
-      new THREE.MeshBasicMaterial({ color: 0x141d29, side: THREE.BackSide, fog: false })
+      new THREE.MeshBasicMaterial({ color: 0x1b2534, side: THREE.BackSide, fog: false })
     );
     g.add(sky);
     this.sky = sky;

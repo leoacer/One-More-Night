@@ -73,7 +73,6 @@ export const ITEMS = {
   tape_b: { name: 'Tape — unlabelled', glyph: '🎞', kind: 'document', doc: 'tape_b', desc: 'No label. Someone scratched the plastic where a label should be.' },
   tape_c: { name: 'Tape — "For whoever"', glyph: '🎞', kind: 'document', doc: 'tape_c', desc: 'A strip of masking tape reads: FOR WHOEVER IS IN 204 NOW.' },
   photo_two: { name: 'Photograph', glyph: '🖼', kind: 'document', doc: 'photo_two', desc: 'A colour photograph gone orange with age. Two people in a lit room.' },
-  photo_ilse: { name: "Ilse's Photograph", glyph: '🖼', kind: 'document', doc: 'photo_ilse', desc: 'Taken in 302. The wallpaper is the same wallpaper. The people are not.' },
   photo_group: { name: 'Group Photograph', glyph: '🖼', kind: 'document', doc: 'photo_group', desc: 'Residents on the front steps, squinting. Someone has been scratched out.' },
   news_blackout: { name: 'Newspaper Cutting', glyph: '📰', kind: 'document', doc: 'news_blackout', desc: 'Front page, day three of the blackout.' },
   news_fire: { name: 'Newspaper — Archive', glyph: '📰', kind: 'document', doc: 'news_fire', desc: 'Yellowed. Folded so the headline is on the outside.' },

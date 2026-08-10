@@ -293,6 +293,8 @@ export class DialoguePanel {
     this.textNode.textContent = '';
     this.typing = 0;
     this.opts = (node.opts || []).filter((o) => !o.if || o.if(st));
+    // never leave the player stranded in a node whose options all failed
+    if (!this.opts.length) this.opts = [{ t: 'I should go.', to: null, fx: { close: true } }];
     this.renderOpts();
   }
 

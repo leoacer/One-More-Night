@@ -102,7 +102,14 @@ export class Player {
     this.vel.set(0, 0, 0);
     this.yaw = yaw;
     this.pitch = 0;
-    this.groundY = y;
+    // land on whatever is actually here — stairs and lift cars are not
+    // at the level's nominal height
+    this._probe.set(x, y + 2.4, z);
+    this.ray.set(this._probe, this._down);
+    this.ray.far = 5.0;
+    const hit = this.ray.intersectObjects(this.walkable, false)[0];
+    if (hit) this.pos.y = hit.point.y;
+    this.groundY = this.pos.y;
     this.grounded = true;
   }
 

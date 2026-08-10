@@ -119,9 +119,16 @@ function windowDressing(b, room, y, bounds) {
   for (const dx of [-1.4, 1.4]) {
     const sill = P.box(1.3, 0.06, 0.26, MAT.flat(0x6a6357, 0.85, 0.02), cx + dx, y + 0.95, facadeZ + inward * 0.16);
     b.group(lv).add(sill);
-    const cur = P.curtain(1.5, 1.55, 0x39352e);
-    cur.position.set(cx + dx, y + 2.5, facadeZ + inward * 0.28);
-    b.group(lv).add(cur);
+    // Curtains are bunched at the jambs, not drawn — the whole point of a
+    // window in this game is that you can look through it.
+    for (const side of [-1, 1]) {
+      const cur = P.curtain(0.34, 1.6, 0x39352e);
+      cur.position.set(cx + dx + side * 0.76, y + 2.55, facadeZ + inward * 0.3);
+      b.group(lv).add(cur);
+    }
+    // pelmet rail across the top
+    const rail = P.box(1.9, 0.05, 0.05, MAT.metal(true), cx + dx, y + 2.55, facadeZ + inward * 0.3);
+    b.group(lv).add(rail);
   }
 }
 

@@ -24,7 +24,7 @@ export class LightRig {
       scene.add(l);
       this.pool.push(l);
     }
-    this.ambient = new THREE.HemisphereLight(0x39506a, 0x0d1114, 0.13);
+    this.ambient = new THREE.HemisphereLight(0x59677c, 0x0d1114, 0.13);
     // 0 indoors, 1 on the roof. Outside, an overcast sky is the only light
     // there is, and it needs to be a great deal stronger than the indoor floor.
     this.skyMix = 0;
@@ -133,7 +133,7 @@ export class LightRig {
       l.decay = 1.6;
     }
 
-    this.ambient.intensity = (0.13 + this.skyMix * 42) * (1 - this.dip * 0.72 * (1 - this.skyMix)) * (1 - this.blackout * 0.9);
+    this.ambient.intensity = (0.13 + this.skyMix * 13) * (1 - this.dip * 0.72 * (1 - this.skyMix)) * (1 - this.blackout * 0.9);
   }
 
   dispose() {

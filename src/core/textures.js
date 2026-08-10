@@ -189,8 +189,8 @@ function genWallpaper(variant, size = 512) {
         ctx.save();
         ctx.translate(ox % size, oy);
         ctx.strokeStyle = pal[1];
-        ctx.lineWidth = 2.2;
-        ctx.globalAlpha = 0.75;
+        ctx.lineWidth = 3.0;
+        ctx.globalAlpha = 0.92;
         for (let p = 0; p < 6; p++) {
           ctx.beginPath();
           const a = (p / 6) * Math.PI * 2;
@@ -211,8 +211,8 @@ function genWallpaper(variant, size = 512) {
         ctx.save();
         ctx.translate(gx * cell + cell / 2, gy * cell + cell / 2);
         ctx.rotate((gx + gy) * 0.7);
-        ctx.globalAlpha = 0.6;
-        ctx.strokeStyle = pal[1]; ctx.lineWidth = 1.6;
+        ctx.globalAlpha = 0.88;
+        ctx.strokeStyle = pal[1]; ctx.lineWidth = 2.6;
         ctx.beginPath(); ctx.moveTo(0, cell * 0.2); ctx.lineTo(0, -cell * 0.2); ctx.stroke();
         for (let p = 0; p < 4; p++) {
           ctx.beginPath();

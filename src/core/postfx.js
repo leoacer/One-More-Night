@@ -114,7 +114,7 @@ void main(){
 
   // ── film grain (luma-weighted so shadows stay noisy, highlights clean)
   float g = noise(gl_FragCoord.xy * 0.85 + vec2(time * 61.3, time * 37.7));
-  float gw = mix(0.055, 0.012, smoothstep(0.0, 0.6, l));
+  float gw = mix(0.040, 0.010, smoothstep(0.0, 0.6, l));
   col += (g - 0.5) * gw * grain * 2.2;
 
   // ── a faint horizontal tear when things are very wrong

@@ -163,6 +163,17 @@ export const DIALOGUE = {
         text: "Because you still ask questions in the right order. That goes, you know. It goes before the memory does.",
         opts: [{ t: "Whose memory?", to: 'i2_twice', tag: 'probe' }],
       },
+      i2_alright: {
+        text: "I slept badly and I have been sitting here since it got dark deciding whether to say something to you, and I have decided about nine times, so — no. Not especially. Thank you for asking; nobody does.",
+        opts: [
+          { t: "Then say it.", to: 'i2_twice', tag: 'hard' },
+          { t: "I'll sit with you a minute.", to: 'i2_sit', tag: 'kind', fx: { trust: 2 } },
+        ],
+      },
+      i2_sit: {
+        text: "…That's a minute of your ten. You've never spent one on me before. — Alright. Alright, then, I'll be quick, because you'll want the rest of them.",
+        opts: [{ t: "Go on.", to: 'i2_say', tag: 'probe' }],
+      },
       i2_twice: {
         text: "Did I? Then it was important. I've been trying to say something to you for a long while and it keeps not surviving the journey.",
         opts: [

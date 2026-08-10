@@ -143,7 +143,7 @@ export const MAT = {
   windowPane() {
     return std('winpane', {
       color: 0x0b1219,
-      transparent: true, opacity: 0.34,
+      transparent: true, opacity: 0.2,
       roughness: 0.14, metalness: 0.35,
       alphaMap: TX.get('grime:61', [1, 1]),
       side: THREE.DoubleSide,

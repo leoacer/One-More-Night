@@ -3,14 +3,14 @@
 // ══════════════════════════════════════════════════════════════════════
 import * as THREE from 'three';
 
-import { $, el, esc, clamp, damp, fmtTime, makeRng } from './core/util.js';
-import { Input, loadSettings, saveSettings, bindSettingsUI } from './core/input.js';
+import { $, el, esc, clamp, damp, makeRng } from './core/util.js';
+import { Input, loadSettings, bindSettingsUI } from './core/input.js';
 import { AudioEngine } from './core/audio.js';
 import { PostFX } from './core/postfx.js';
 import { TX } from './core/textures.js';
 import * as ST from './core/state.js';
 
-import { GEO, LEVELS, ROOF_LEVEL, ROOMS, HOME_ID, levelY, levelName, levelShort, slotBounds } from './world/layout.js';
+import { GEO, ROOF_LEVEL, ROOMS, HOME_ID, levelY, slotBounds } from './world/layout.js';
 import { Building } from './world/building.js';
 import { furnishRoom } from './world/furnish.js';
 import { MAT } from './world/materials.js';
@@ -108,7 +108,7 @@ class Game {
     renderer.setClearColor(0x05070a, 1);
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x0b1017, 0.021);
+    this.scene.fog = new THREE.FogExp2(0x151d28, 0.021);
     this.camera = new THREE.PerspectiveCamera(this.settings.fov, 1, 0.06, 260);
 
     this.post = new PostFX(renderer, this.settings);
