@@ -9,6 +9,16 @@
 import { makeRng } from '../core/util.js';
 import { ROOMS, GEO } from '../world/layout.js';
 import { flag } from '../core/state.js';
+import { t } from '../core/i18n.js';
+
+/** t() with {placeholder} substitution — the changing world needs names in its sentences. */
+function ts(key, fallback, vars) {
+  let s = t(key, fallback);
+  for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(v);
+  return s;
+}
+
+const NO_NUMBER_DOOR = () => t('world.doorNoNumber', 'The door with no number');
 
 export const NIGHTS = {
   1: {
@@ -90,8 +100,8 @@ const CHANGE_POOL = [
       plan.plateSwaps[b.id] = a.plate;
       const [x] = slotX(a);
       return {
-        obs: { lv, x, z: sideZ(a), r: 3.2, text: `The number on ${a.name.replace('Apartment ', '')} reads ${b.plate}. You are certain it read ${a.plate}.` },
-        note: `Apartment numbers ${a.plate} and ${b.plate} have swapped places.`,
+        obs: { lv, x, z: sideZ(a), r: 3.2, text: ts('chg.plate_swap.obs', 'The number on {room} reads {now}. You are certain it read {was}.', { room: a.plate, now: b.plate, was: a.plate }) },
+        note: ts('chg.plate_swap.note', 'Apartment numbers {a} and {b} have swapped places.', { a: a.plate, b: b.plate }),
       };
     },
   },
@@ -105,8 +115,8 @@ const CHANGE_POOL = [
       plan.roomState[r.id] = { ...(plan.roomState[r.id] || {}), door: now };
       const [x] = slotX(r);
       return {
-        obs: { lv: r.lv, x, z: sideZ(r), r: 2.8, text: `${r.name} has been repainted. It was not this colour yesterday. There is no smell of paint.` },
-        note: `${r.name} changed colour overnight.`,
+        obs: { lv: r.lv, x, z: sideZ(r), r: 2.8, text: ts('chg.door_colour.obs', '{room} has been repainted. It was not this colour yesterday. There is no smell of paint.', { room: r.name }) },
+        note: ts('chg.door_colour.note', '{room} changed colour overnight.', { room: r.name }),
       };
     },
   },
@@ -117,7 +127,7 @@ const CHANGE_POOL = [
       const i = rng.int(0, 4);
       plan.lightsOff.push(`cor_${lv}_${i}`);
       return {
-        obs: { lv, x: -8 + i * 4, z: 0, r: 3.0, text: 'The corridor lamp here is dead. The glass is cold. It was on when you passed it.' },
+        obs: { lv, x: -8 + i * 4, z: 0, r: 3.0, text: t('chg.lamp_out.obs', 'The corridor lamp here is dead. The glass is cold. It was on when you passed it.') },
         note: null,
       };
     },
@@ -139,8 +149,8 @@ const CHANGE_POOL = [
       plan.roomState[r.id] = { ...(plan.roomState[r.id] || {}), lock: 'open', furnish: 'abandoned' };
       const [x] = slotX(r);
       return {
-        obs: { lv: r.lv, x, z: sideZ(r), r: 2.6, text: `${r.name} is unlocked. It has been locked every night since you moved in.` },
-        note: `${r.name} was open tonight.`,
+        obs: { lv: r.lv, x, z: sideZ(r), r: 2.6, text: ts('chg.unlock.obs', '{room} is unlocked. It has been locked every night since you moved in.', { room: r.name }) },
+        note: ts('chg.unlock.note', '{room} was open tonight.', { room: r.name }),
       };
     },
   },
@@ -151,14 +161,16 @@ const CHANGE_POOL = [
       if (!cands.length) return null;
       const r = rng.pick(cands);
       plan.roomState[r.id] = { ...(plan.roomState[r.id] || {}), lock: 'locked' };
-      return { obs: null, note: `${r.name} is locked tonight. It was not before.` };
+      return { obs: null, note: ts('chg.lock.note', '{room} is locked tonight. It was not before.', { room: r.name }) };
     },
   },
   {
     id: 'graffiti',
     apply(plan, rng) {
       const lv = rng.pick([-1, 0, 1, 2]);
-      const text = rng.pick(['404', 'HE COUNTS', 'ONE MORE', 'SHUT THE DOOR', 'seven', 'IT IS YOU']);
+      const [key, en] = rng.pick([['404', '404'], ['w.heCounts', 'HE COUNTS'], ['w.oneMore', 'ONE MORE'],
+        ['w.shutTheDoor', 'SHUT THE DOOR'], ['w.sevenLower', 'seven'], ['w.itIsYou', 'IT IS YOU']]);
+      const text = t(key, en);
       plan.graffiti.push({ lv, x: rng.range(-8, 8), text });
       return { obs: null, note: null };
     },
@@ -260,12 +272,16 @@ export function makeNightPlan(st) {
       plan.distortion = 0.1;
       plan.extraDoors.push({
         id: 'newdoor', lv: 2, side: 's', x: (GEO.SLOTS[0][1] + GEO.SLOTS[1][0]) / 2,
-        texture: 'doorBlack', label: 'The door with no number', locked: true, interact: 'newdoor',
+        texture: 'doorBlack', label: NO_NUMBER_DOOR(), locked: true, interact: 'newdoor',
       });
       plan.observations.push({
         id: 'newdoor_seen', lv: 2, x: (GEO.SLOTS[0][1] + GEO.SLOTS[1][0]) / 2, z: GEO.COR_Z0 + 0.5, r: 3.4,
-        text: 'There is a door here. Between 302 and 304, in a stretch of wall you have walked past a hundred times. It has no number.',
-        journal: { cat: 'events', title: 'A door that was not there', text: 'Third floor, south side, between 302 and 304. No number plate, no keyhole, warm to the touch. It has always been there, according to the paint.' },
+        text: t('obs.newdoor_seen', 'There is a door here. Between 302 and 304, in a stretch of wall you have walked past a hundred times. It has no number.'),
+        journal: {
+          cat: 'events',
+          title: t('obs.newdoor_seen.jt', 'A door that was not there'),
+          text: t('obs.newdoor_seen.jx', 'Third floor, south side, between 302 and 304. No number plate, no keyhole, warm to the touch. It has always been there, according to the paint.'),
+        },
         flag: 'seen_newdoor',
       });
       plan.events.push(
@@ -283,7 +299,7 @@ export function makeNightPlan(st) {
       plan.distortion = 0.16;
       plan.extraDoors.push({
         id: 'newdoor', lv: 2, side: 's', x: (GEO.SLOTS[0][1] + GEO.SLOTS[1][0]) / 2,
-        texture: 'doorBlack', label: 'The door with no number', locked: true, interact: 'newdoor',
+        texture: 'doorBlack', label: NO_NUMBER_DOOR(), locked: true, interact: 'newdoor',
       });
       // the lift lies about where it is going
       plan.elevatorMap = { '-1': -1, 0: 0, 1: rng.chance(0.5) ? 2 : 1, 2: 3, 3: rng.chance(0.6) ? 1 : 3 };
@@ -297,8 +313,12 @@ export function makeNightPlan(st) {
       );
       plan.observations.push({
         id: 'lift_wrong', lv: 3, x: -9, z: 0, r: 4,
-        text: 'The lift said three. The plate on the wall says four. Both of them cannot be right and neither of them feels like it is lying.',
-        journal: { cat: 'events', title: 'The lift goes to four', text: 'Pressing 3 put me on a floor whose plates all read 4. The stairwell above the third floor is still blocked with junk.' },
+        text: t('obs.lift_wrong', 'The lift said three. The plate on the wall says four. Both of them cannot be right and neither of them feels like it is lying.'),
+        journal: {
+          cat: 'events',
+          title: t('obs.lift_wrong.jt', 'The lift goes to four'),
+          text: t('obs.lift_wrong.jx', 'Pressing 3 put me on a floor whose plates all read 4. The stairwell above the third floor is still blocked with junk.'),
+        },
         flag: 'seen_floor4',
       });
       plan.threat = { follower: true, aggression: 0.3, from: 200 };
@@ -309,7 +329,7 @@ export function makeNightPlan(st) {
       plan.distortion = 0.24;
       plan.extraDoors.push({
         id: 'newdoor', lv: 2, side: 's', x: (GEO.SLOTS[0][1] + GEO.SLOTS[1][0]) / 2,
-        texture: 'doorBlack', label: 'The door with no number', locked: true, interact: 'newdoor',
+        texture: 'doorBlack', label: NO_NUMBER_DOOR(), locked: true, interact: 'newdoor',
       });
       plan.elevatorMap = { '-1': -1, 0: 0, 1: 1, 2: 2, 3: 3 };
       // people are in the wrong places
@@ -332,8 +352,12 @@ export function makeNightPlan(st) {
       plan.threat = { follower: true, aggression: 0.6, from: 60 };
       plan.observations.push({
         id: 'ilse_moved', lv: 2, x: 0, z: GEO.COR_Z1 - 0.4, r: 4,
-        text: 'Ilse is in 305 tonight, and behaves as though she has always been in 305. Her furniture is in 305. It was in 302 yesterday, and 302 is empty again.',
-        journal: { cat: 'characters', title: 'Ilse has moved apartments', text: 'She lives in 305 now, with all her things, and does not remember 302. 302 is empty and clean.' },
+        text: t('obs.ilse_moved', 'Ilse is in 305 tonight, and behaves as though she has always been in 305. Her furniture is in 305. It was in 302 yesterday, and 302 is empty again.'),
+        journal: {
+          cat: 'characters',
+          title: t('obs.ilse_moved.jt', 'Ilse has moved apartments'),
+          text: t('obs.ilse_moved.jx', 'She lives in 305 now, with all her things, and does not remember 302. 302 is empty and clean.'),
+        },
       });
       break;
     }
@@ -342,7 +366,7 @@ export function makeNightPlan(st) {
       plan.distortion = 0.34;
       plan.extraDoors.push({
         id: 'newdoor', lv: 2, side: 's', x: (GEO.SLOTS[0][1] + GEO.SLOTS[1][0]) / 2,
-        texture: 'doorBlack', label: 'The door with no number', locked: true, interact: 'newdoor',
+        texture: 'doorBlack', label: NO_NUMBER_DOOR(), locked: true, interact: 'newdoor',
       });
       plan.roomState['404'] = { lock: 'open' };
       plan.roomState['office'] = { lock: 'open' };
@@ -364,7 +388,7 @@ export function makeNightPlan(st) {
       plan.threat = { follower: true, aggression: 0.75, from: 40 };
       plan.observations.push({
         id: 'stair_wedge', lv: 0, x: 9.4, z: 0, r: 2.2,
-        text: 'There is something wedged under the stairwell door on this floor.',
+        text: t('obs.stair_wedge', 'There is something wedged under the stairwell door on this floor.'),
       });
       break;
     }
@@ -374,7 +398,7 @@ export function makeNightPlan(st) {
       plan.corridorStretch = 1;
       plan.extraDoors.push({
         id: 'newdoor', lv: 2, side: 's', x: (GEO.SLOTS[0][1] + GEO.SLOTS[1][0]) / 2,
-        texture: 'doorBlack', label: 'The door with no number', locked: false, interact: 'newdoor_final',
+        texture: 'doorBlack', label: NO_NUMBER_DOOR(), locked: false, interact: 'newdoor_final',
       });
       plan.roomState['404'] = { lock: 'open' };
       plan.roomState['office'] = { lock: 'open' };

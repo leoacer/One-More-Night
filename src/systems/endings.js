@@ -3,6 +3,8 @@
 //  and how much of the building you understood before you did it.
 // ══════════════════════════════════════════════════════════════════════
 
+import { t } from '../core/i18n.js';
+
 export const ENDINGS = {
   escape: {
     title: 'The Street',
@@ -129,13 +131,13 @@ export function resolveEnding(st, how) {
 
 export function endingStats(st) {
   const out = [
-    { k: 'Nights', v: `${st.stats.nightsDone}` },
-    { k: 'Evidence', v: `${st.evidence.length}` },
-    { k: 'Documents', v: `${st.docsRead.length}` },
-    { k: 'People met', v: `${st.metNpcs.length}` },
+    { k: t('ui.nights', 'Nights'), v: `${st.stats.nightsDone}` },
+    { k: t('ui.evidence', 'Evidence'), v: `${st.evidence.length}` },
+    { k: t('ui.documents', 'Documents'), v: `${st.docsRead.length}` },
+    { k: t('ui.peopleMet', 'People met'), v: `${st.metNpcs.length}` },
   ];
   const bonds = Object.entries(st.trust).filter(([, v]) => v >= 4).map(([k]) => k);
-  if (bonds.length) out.push({ k: 'Trusted by', v: `${bonds.length}` });
-  if (st.journal.notes.length) out.push({ k: 'Own notes', v: `${st.journal.notes.length}` });
+  if (bonds.length) out.push({ k: t('ui.trustedBy', 'Trusted by'), v: `${bonds.length}` });
+  if (st.journal.notes.length) out.push({ k: t('ui.ownNotes', 'Own notes'), v: `${st.journal.notes.length}` });
   return out;
 }

@@ -9,6 +9,7 @@ import * as P from './props.js';
 import { DOCS } from '../data/lore.js';
 import { ITEMS } from '../data/items.js';
 import { makeRng } from '../core/util.js';
+import { t } from '../core/i18n.js';
 
 // ── helpers ─────────────────────────────────────────────────────────────
 
@@ -60,7 +61,7 @@ function lamp(b, room, y, x, z, opts = {}) {
 }
 
 function readable(b, lv, obj, docId, opts = {}) {
-  b.interact(obj, { type: 'read', doc: docId, label: opts.label || 'Read', once: opts.once });
+  b.interact(obj, { type: 'read', doc: docId, label: opts.label || t('lbl.read', 'Read'), once: opts.once });
   return obj;
 }
 
@@ -158,9 +159,9 @@ const RECIPES = {
 
     // Nothing solid goes in the strip between the front door and the middle
     // of the room: x within ±1.0 of centre, z from the door back to cz + 0.4.
-    const t = P.table(1.1, 0.75);
-    t.position.set(cx + 0.1, y, cz - 0.5);
-    b.addMesh(lv, t, { solid: true });
+    const tbl = P.table(1.1, 0.75);
+    tbl.position.set(cx + 0.1, y, cz - 0.5);
+    b.addMesh(lv, tbl, { solid: true });
     const ch = P.chair(); ch.position.set(cx - 1.0, y, cz - 0.5); ch.rotation.y = Math.PI / 2;
     b.addMesh(lv, ch, { solid: true });
     const ch2 = P.chair(); ch2.position.set(cx + 1.2, y, cz - 0.5); ch2.rotation.y = -Math.PI / 2;
@@ -199,12 +200,12 @@ const RECIPES = {
     const bk = P.box(0.16, 0.03, 0.22, MAT.flat(0x5a4a3a, 0.9, 0), bounds.x1 - 1.55, y + 0.47, bounds.z1 - 1.3);
     bk.rotation.y = 0.3;
     b.group(lv).add(bk);
-    b.interact(bk, { type: 'examine', text: 'A book, face down on the arm of the chair, open at the same page it has been open at since you moved in. You have never got past that page.' });
+    b.interact(bk, { type: 'examine', text: t('ex.book', 'A book, face down on the arm of the chair, open at the same page it has been open at since you moved in. You have never got past that page.') });
 
     const cl = P.clock(0.15);
     cl.position.set(cx, y + 2.1, bounds.z0 + 0.12);
     b.group(lv).add(cl);
-    b.interact(cl, { type: 'examine', text: 'The clock stopped a long time ago. Both hands are still. You keep meaning to wind it, and you keep not doing it.' });
+    b.interact(cl, { type: 'examine', text: t('ex.clock', 'The clock stopped a long time ago. Both hands are still. You keep meaning to wind it, and you keep not doing it.') });
     b.props.set('home_clock', cl);
 
     const mr = P.mirror(0.5, 0.8);
@@ -226,12 +227,12 @@ const RECIPES = {
       bounds.x1 - 1.38, y + 0.44, bounds.z0 + 1.1);
     drawer.rotation.y = -Math.PI / 2;
     b.group(lv).add(drawer);
-    b.interact(drawer, { type: 'item', item: 'note_lease', doc: 'note_lease', label: 'Papers in the drawer' });
+    b.interact(drawer, { type: 'item', item: 'note_lease', doc: 'note_lease', label: t('lbl.papers', 'Papers in the drawer') });
 
     // the frame of your own front door — searchable from inside
     const frameMark = P.box(0.9, 0.06, 0.1, MAT.flat(0x3a3128, 0.9, 0.02), cx, y + 2.12, bounds.z1 - 0.14);
     b.group(lv).add(frameMark);
-    b.interact(frameMark, { type: 'read', doc: 'frame_marks', label: 'Door frame' });
+    b.interact(frameMark, { type: 'read', doc: 'frame_marks', label: t('lbl.doorFrame', 'Door frame') });
   },
 
   // ── Tomas, 104 ────────────────────────────────────────────────────
@@ -257,9 +258,9 @@ const RECIPES = {
       b.group(lv).add(bx);
     }
 
-    const t = P.table(1.2, 0.8);
-    t.position.set(bounds.x0 + 1.5, y, cz + 1.0);
-    b.addMesh(lv, t, { solid: true });
+    const tbl = P.table(1.2, 0.8);
+    tbl.position.set(bounds.x0 + 1.5, y, cz + 1.0);
+    b.addMesh(lv, tbl, { solid: true });
     const ch = P.chair(); ch.position.set(bounds.x0 + 1.5, y, cz + 2.0); ch.rotation.y = Math.PI;
     b.addMesh(lv, ch, { solid: true });
 
@@ -306,9 +307,9 @@ const RECIPES = {
     b.group(lv).add(bl);
     b.props.set('mira_ball', bl);
 
-    const t = P.table(0.9, 0.6, 0.55);
-    t.position.set(cx + 1.2, y, cz - 0.4);
-    b.addMesh(lv, t, { solid: true });
+    const tbl = P.table(0.9, 0.6, 0.55);
+    tbl.position.set(cx + 1.2, y, cz - 0.4);
+    b.addMesh(lv, tbl, { solid: true });
     const st = P.stool(); st.position.set(cx + 1.2, y, cz + 0.4);
     b.addMesh(lv, st, { solid: true });
     lamp(b, room, y, cx + 1.2, cz - 0.6, { desk: true, onSurface: 0.58, intensity: 2.0, distance: 3.6 });
@@ -341,10 +342,10 @@ const RECIPES = {
     windowDressing(b, room, y, bounds);
     ceilingLight(b, room, y, cx, cz, { intensity: 2.2, color: 0xffb870, id: 'ilse_main' });
 
-    const t = P.table(1.3, 0.85);
-    t.position.set(cx, y, cz + 0.6);
-    b.addMesh(lv, t, { solid: true });
-    b.props.set('ilse_table', t);
+    const tbl = P.table(1.3, 0.85);
+    tbl.position.set(cx, y, cz + 0.6);
+    b.addMesh(lv, tbl, { solid: true });
+    b.props.set('ilse_table', tbl);
     for (const [dx, ry] of [[-1.0, Math.PI / 2], [1.0, -Math.PI / 2]]) {
       const ch = P.chair(); ch.position.set(cx + dx, y, cz + 0.6); ch.rotation.y = ry;
       b.addMesh(lv, ch, { solid: true });
@@ -395,7 +396,7 @@ const RECIPES = {
     framed.position.set(cx + 1.4, y + 0.98, bounds.z0 + 0.34);
     framed.rotation.x = -0.35;
     b.group(lv).add(framed);
-    b.interact(framed, { type: 'item', item: 'photo_two', doc: 'photo_two', label: 'Photograph' });
+    b.interact(framed, { type: 'item', item: 'photo_two', doc: 'photo_two', label: t('lbl.photograph', 'Photograph') });
     b.props.set('ilse_photo', framed);
 
     const cl = P.clock(0.16);
@@ -473,10 +474,10 @@ const RECIPES = {
     sofa.rotation.y = Math.PI + rng.range(-0.2, 0.2);
     b.addMesh(lv, sofa, { solid: true });
 
-    const t = P.table(1.1, 0.7);
-    t.position.set(cx - 0.4, y, cz);
-    t.rotation.y = rng.range(-0.3, 0.3);
-    b.addMesh(lv, t, { solid: true });
+    const tbl = P.table(1.1, 0.7);
+    tbl.position.set(cx - 0.4, y, cz);
+    tbl.rotation.y = rng.range(-0.3, 0.3);
+    b.addMesh(lv, tbl, { solid: true });
     const c1 = P.chair(rng.chance(0.5));
     c1.position.set(cx - 0.4, y, cz + 1.0);
     b.addMesh(lv, c1, { solid: true });
@@ -485,7 +486,7 @@ const RECIPES = {
     wd.position.set(bounds.x1 - 0.7, y, bounds.z0 + 0.6);
     wd.rotation.y = -Math.PI / 2;
     b.addMesh(lv, wd, { solid: true });
-    b.interact(wd, { type: 'examine', text: 'The wardrobe is empty except for hangers, and the hangers are all facing the same way, which is somehow worse than if they were not.' });
+    b.interact(wd, { type: 'examine', text: t('ex.wardrobe', 'The wardrobe is empty except for hangers, and the hangers are all facing the same way, which is somehow worse than if they were not.') });
 
     const dr = P.dresser(0.9);
     dr.position.set(cx + 1.8, y, bounds.z0 + 0.4);
@@ -555,9 +556,9 @@ const RECIPES = {
       b.addMesh(lv, w, { solid: true });
       b.interact(w, { type: 'washer', index: i });
     }
-    const t = P.table(1.6, 0.7, 0.9);
-    t.position.set(cx + 1.2, y, cz - 0.6);
-    b.addMesh(lv, t, { solid: true });
+    const tbl = P.table(1.6, 0.7, 0.9);
+    tbl.position.set(cx + 1.2, y, cz - 0.6);
+    b.addMesh(lv, tbl, { solid: true });
     const sk = P.sink(0.7);
     sk.position.set(bounds.x1 - 0.8, y, bounds.z1 - 0.5);
     sk.rotation.y = Math.PI;
@@ -675,7 +676,7 @@ const RECIPES = {
 
     const log = P.box(0.24, 0.05, 0.32, MAT.flat(0x3a3028, 0.9, 0), cx + 0.5, y + 0.81, cz - 1.2);
     b.group(lv).add(log);
-    b.interact(log, { type: 'item', item: 'note_halvard', doc: 'note_halvard', label: 'Maintenance Log' });
+    b.interact(log, { type: 'item', item: 'note_halvard', doc: 'note_halvard', label: t('lbl.maintLog', 'Maintenance Log') });
 
     const keys = new THREE.Group();
     for (let i = 0; i < 9; i++) {
@@ -717,7 +718,8 @@ const RECIPES = {
     mb.position.set(bounds.x0 + 0.28, y + 1.6, cz);
     mb.rotation.y = Math.PI / 2;
     b.group(lv).add(mb);
-    b.interact(mb, { type: 'examine', text: 'Five meters, one per occupied apartment. Four of them are turning slowly. The fifth — 204 — is turning very fast, and has been for a long time, judging by the numbers.' });
+    b.interact(mb, { type: 'examine', text: t('ex.meters', 'Five meters, one per occupied apartment. Four of them are turning slowly. The fifth — 204 — is turning very fast, and has been for a long time, judging by the numbers.') });
+    spawnItem(b, lv, 'key_basement', cx - 2.2, y + 0.94, bounds.z1 - 0.6, { mesh: 'key' });
     spawnItem(b, lv, 'bulb', cx - 1.0, y + 0.94, bounds.z1 - 0.6, { qty: 2 });
     spawnItem(b, lv, 'recorder', cx - 1.6, y + 0.94, bounds.z1 - 0.6, { mesh: 'recorder' });
     spawnItem(b, lv, 'tape_a', cx - 0.4, y + 0.94, bounds.z1 - 0.6, { mesh: 'tape' });
@@ -797,7 +799,7 @@ const RECIPES = {
     mb.position.set(bounds.x0 + 0.4, y + 1.45, cz);
     mb.rotation.y = Math.PI / 2;
     b.group(lv).add(mb);
-    b.interact(mb, { type: 'read', doc: 'mailbox_note', label: 'Mailboxes' });
+    b.interact(mb, { type: 'read', doc: 'mailbox_note', label: t('lbl.mailboxes', 'Mailboxes') });
 
     const board = P.plane(1.2, 0.8, MAT.flat(0x4a4032, 0.95, 0));
     board.position.set(cx + 2.0, y + 1.7, bounds.z0 + 0.12);
@@ -836,16 +838,16 @@ const RECIPES = {
         b.group(lv).add(bx);
       }
     }
-    const t = P.table(1.4, 0.9);
-    t.position.set(cx, y, cz + 1.4);
-    b.addMesh(lv, t, { solid: true });
+    const tbl = P.table(1.4, 0.9);
+    tbl.position.set(cx, y, cz + 1.4);
+    b.addMesh(lv, tbl, { solid: true });
     lamp(b, room, y, cx - 0.5, cz + 1.4, { desk: true, onSurface: 0.79, intensity: 2.4, distance: 4 });
     const folder = P.box(0.3, 0.04, 0.4, MAT.flat(0x8a7f66, 0.92, 0), cx + 0.3, y + 0.79, cz + 1.4);
     b.group(lv).add(folder);
-    b.interact(folder, { type: 'item', item: 'file_404', doc: 'file_404', label: 'File — 404' });
+    b.interact(folder, { type: 'item', item: 'file_404', doc: 'file_404', label: t('lbl.file404', 'File — 404') });
     const bookM = P.box(0.32, 0.09, 0.42, MAT.flat(0x4a2a24, 0.9, 0), cx - 0.35, y + 0.83, cz + 1.5);
     b.group(lv).add(bookM);
-    b.interact(bookM, { type: 'item', item: 'register', doc: 'register', label: 'Building Register' });
+    b.interact(bookM, { type: 'item', item: 'register', doc: 'register', label: t('lbl.register', 'Building Register') });
     spawnItem(b, lv, 'tape_c', cx + 0.9, y + 0.79, cz + 1.2, { mesh: 'tape' });
     clutter(b, room, y, bounds, 71, 0.4);
   },
@@ -865,10 +867,10 @@ const RECIPES = {
     b.group(lv).add(marker);
     b.interact(marker, { type: 'read', doc: 'impossible_room' });
     // make it discoverable by looking at the table
-    const t = P.table(0.6, 0.5, 0.8);
-    t.position.set(cx + 2.2, y, cz - 1.8);
-    b.addMesh(lv, t, { solid: true });
-    b.interact(t, { type: 'read', doc: 'impossible_room' });
+    const tbl = P.table(0.6, 0.5, 0.8);
+    tbl.position.set(cx + 2.2, y, cz - 1.8);
+    b.addMesh(lv, tbl, { solid: true });
+    b.interact(tbl, { type: 'read', doc: 'impossible_room' });
   },
 };
 

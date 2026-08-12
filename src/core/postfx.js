@@ -5,6 +5,7 @@
 //  dependency on three's example addons.
 // ══════════════════════════════════════════════════════════════════════
 import * as THREE from 'three';
+import { tierOf } from './quality.js';
 
 const VERT = /* glsl */`
 varying vec2 vUv;
@@ -202,11 +203,13 @@ export class PostFX {
   }
 
   setSize(w, h) {
-    const s = Math.max(0.5, this.settings.quality);
+    const tier = tierOf(this.settings);
+    const s = Math.max(0.5, tier.render);
     this.w = Math.max(2, Math.floor(w * s));
     this.h = Math.max(2, Math.floor(h * s));
     this.sceneRT.setSize(this.w, this.h);
-    const bw = Math.max(2, this.w >> 2), bh = Math.max(2, this.h >> 2);
+    const div = tier.bloomDiv;
+    const bw = Math.max(2, Math.floor(this.w / div)), bh = Math.max(2, Math.floor(this.h / div));
     this.brightRT.setSize(bw, bh);
     this.blurRT.setSize(bw, bh);
     this.matComp.uniforms.resolution.value.set(this.w, this.h);

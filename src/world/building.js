@@ -10,6 +10,7 @@ import { GEO, LEVELS, ROOF_LEVEL, ROOMS, levelY, slotBounds, corridorLights } fr
 import { MAT } from './materials.js';
 import * as P from './props.js';
 import { makeRng } from '../core/util.js';
+import { t } from '../core/i18n.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
@@ -122,7 +123,7 @@ export class Building {
    *  axis 'z' → wall runs along Z, sits at x = at
    */
   wall({ lv, axis, at, from, to, yBase, height, mat, thickness = GEO.WALL_T, holes = [], collide = true, walk = false }) {
-    const t = thickness;
+    const th = thickness;
     const segs = [];
     const hs = holes.slice().sort((a, b) => a.a0 - b.a0);
     let cur = from;
@@ -142,15 +143,15 @@ export class Building {
       const len = s.a1 - s.a0, h = s.y1 - s.y0;
       if (len <= 0.001 || h <= 0.001) continue;
       const m = axis === 'x'
-        ? P.box(len, h, t, mat, (s.a0 + s.a1) / 2, (s.y0 + s.y1) / 2, at)
-        : P.box(t, h, len, mat, at, (s.y0 + s.y1) / 2, (s.a0 + s.a1) / 2);
+        ? P.box(len, h, th, mat, (s.a0 + s.a1) / 2, (s.y0 + s.y1) / 2, at)
+        : P.box(th, h, len, mat, at, (s.y0 + s.y1) / 2, (s.a0 + s.a1) / 2);
       m.matrixAutoUpdate = false;
       m.updateMatrix();
       this.group(lv).add(m);
       out.push(m);
       if (collide) {
-        if (axis === 'x') this.addCollider(s.a0, s.a1, s.y0, s.y1, at - t / 2, at + t / 2);
-        else this.addCollider(at - t / 2, at + t / 2, s.y0, s.y1, s.a0, s.a1);
+        if (axis === 'x') this.addCollider(s.a0, s.a1, s.y0, s.y1, at - th / 2, at + th / 2);
+        else this.addCollider(at - th / 2, at + th / 2, s.y0, s.y1, s.a0, s.a1);
       }
       if (walk) { this.walkable.push(m); m.userData.walkable = true; }
     }
@@ -308,7 +309,7 @@ export class Building {
     // stairwell door
     this.makeDoor({
       lv, id: `stair_${lv}`, axis: 'z', at: 10, center: 0, yBase: y, texture: 'metal',
-      label: 'Stairwell', peep: false, flip: lv % 2 === 0,
+      label: t('lbl.stairwell', 'Stairwell'), peep: false, flip: lv % 2 === 0,
     });
     // …and, once you have been here long enough to look down, what is
     // holding it open.
@@ -316,7 +317,7 @@ export class Building {
       const wedge = P.box(0.2, 0.022, 0.15, MAT.flat(0x8b8473, 0.96, 0), 9.72, y + 0.013, 0.28);
       wedge.rotation.y = 0.2;
       this.group(lv).add(wedge);
-      this.interact(wedge, { type: 'read', doc: 'wedge', label: 'Something under the door' });
+      this.interact(wedge, { type: 'read', doc: 'wedge', label: t('lbl.wedge', 'Something under the door') });
     }
 
     // ── room partitions + outer envelope
@@ -384,7 +385,7 @@ export class Building {
     const rad = P.radiator(0.9);
     rad.position.set(GEO.SLOTS[1][0] - 0.4, y + 0.12, GEO.COR_Z1 - 0.22);
     this.addMesh(lv, rad, { solid: true });
-    this.interact(rad, { type: 'examine', text: 'A radiator, stone cold. It has been cold for longer than the blackout.' });
+    this.interact(rad, { type: 'examine', text: t('ex.radiator', 'A radiator, stone cold. It has been cold for longer than the blackout.') });
 
     // graffiti / stains, seeded per night so they drift
     const g = this.rng;
@@ -401,13 +402,13 @@ export class Building {
   addWindow(lv, axis, at, center, yBottom, w, h, facing, small) {
     const g = this.group(lv);
     const fm = MAT.flat(0x2e2a24, 0.85, 0.03);
-    const t = 0.34;
+    const th = 0.34;
     // reveal
     if (axis === 'x') {
-      g.add(P.box(w + 0.1, 0.06, t, fm, center, yBottom - 0.03, at));
-      g.add(P.box(w + 0.1, 0.06, t, fm, center, yBottom + h + 0.03, at));
-      g.add(P.box(0.06, h, t, fm, center - w / 2 - 0.03, yBottom + h / 2, at));
-      g.add(P.box(0.06, h, t, fm, center + w / 2 + 0.03, yBottom + h / 2, at));
+      g.add(P.box(w + 0.1, 0.06, th, fm, center, yBottom - 0.03, at));
+      g.add(P.box(w + 0.1, 0.06, th, fm, center, yBottom + h + 0.03, at));
+      g.add(P.box(0.06, h, th, fm, center - w / 2 - 0.03, yBottom + h / 2, at));
+      g.add(P.box(0.06, h, th, fm, center + w / 2 + 0.03, yBottom + h / 2, at));
       // mullions
       g.add(P.box(0.045, h, 0.05, fm, center, yBottom + h / 2, at));
       if (!small) g.add(P.box(w, 0.045, 0.05, fm, center, yBottom + h * 0.55, at));
@@ -548,13 +549,13 @@ export class Building {
       junk.add(board);
       g.add(junk);
       this.addCollider(GEO.LANDING_X1, GEO.MIDLAND_X0, y - 0.4, y + 2.2, -3.0, -0.2, { tag: 'debris' });
-      this.interact(junk, { type: 'examine', text: 'The stair up to the fourth floor is packed with junk — crates, a wardrobe door, something heavy underneath. Someone did this deliberately.' });
+      this.interact(junk, { type: 'examine', text: t('ex.stairJunk', 'The stair up to the fourth floor is packed with junk — crates, a wardrobe door, something heavy underneath. Someone did this deliberately.') });
       this.stairBlock = junk;
     }
   }
 
   _stairWall(g, axis, at, from, to, yBase, height, mat, holes) {
-    const t = 0.24;
+    const th = 0.24;
     const segs = [];
     const hs = holes.slice().sort((a, b) => a.a0 - b.a0);
     let cur = from;
@@ -570,12 +571,12 @@ export class Building {
       const len = s.a1 - s.a0, hh = s.y1 - s.y0;
       if (len <= 0.001 || hh <= 0.001) continue;
       const m = axis === 'x'
-        ? P.box(len, hh, t, mat, (s.a0 + s.a1) / 2, (s.y0 + s.y1) / 2, at)
-        : P.box(t, hh, len, mat, at, (s.y0 + s.y1) / 2, (s.a0 + s.a1) / 2);
+        ? P.box(len, hh, th, mat, (s.a0 + s.a1) / 2, (s.y0 + s.y1) / 2, at)
+        : P.box(th, hh, len, mat, at, (s.y0 + s.y1) / 2, (s.a0 + s.a1) / 2);
       m.matrixAutoUpdate = false; m.updateMatrix();
       g.add(m);
-      if (axis === 'x') this.addCollider(s.a0, s.a1, s.y0, s.y1, at - t / 2, at + t / 2);
-      else this.addCollider(at - t / 2, at + t / 2, s.y0, s.y1, s.a0, s.a1);
+      if (axis === 'x') this.addCollider(s.a0, s.a1, s.y0, s.y1, at - th / 2, at + th / 2);
+      else this.addCollider(at - th / 2, at + th / 2, s.y0, s.y1, s.a0, s.a1);
     }
   }
 
@@ -761,7 +762,7 @@ export class Building {
     g.add(hh);
     this.addCollider(9 - hw / 2, 9 + hw / 2, y, y + hhh, -hd / 2 - 0.1, -hd / 2 + 0.1);
     this.addCollider(9 - hw / 2, 9 + hw / 2, y, y + hhh, hd / 2 - 0.1, hd / 2 + 0.1);
-    this.makeDoor({ lv, id: 'roof_door', axis: 'z', at: 9 - hw / 2, center: 0, yBase: y, texture: 'metal', label: 'Stairwell', peep: false, flip: true });
+    this.makeDoor({ lv, id: 'roof_door', axis: 'z', at: 9 - hw / 2, center: 0, yBase: y, texture: 'metal', label: t('lbl.stairwell', 'Stairwell'), peep: false, flip: true });
 
     // water tank, vents, aerials, a chair someone sat in
     const tank = new THREE.Group();
@@ -772,7 +773,7 @@ export class Building {
     }
     tank.position.set(-6, y + 0.9, 4.5);
     this.addMesh(lv, tank, { solid: true });
-    this.interact(tank, { type: 'examine', text: 'The water tank. Empty, by the sound of it. Something scratched a tally into the side — dozens of marks, grouped in sevens.' });
+    this.interact(tank, { type: 'examine', text: t('ex.waterTank', 'The water tank. Empty, by the sound of it. Something scratched a tally into the side — dozens of marks, grouped in sevens.') });
 
     for (const [vx, vz] of [[-2, -5], [1.5, 5.5], [5, -4.4], [-8, -2]]) {
       const vent = new THREE.Group();
@@ -783,7 +784,7 @@ export class Building {
     }
     const plaque = P.box(0.7, 0.34, 0.05, MAT.flat(0x3d5148, 0.72, 0.45), -2.5, y + 0.62, GEO.S_Z0 - 0.05);
     g.add(plaque);
-    this.interact(plaque, { type: 'read', doc: 'roof_plaque', label: 'A cast plate' });
+    this.interact(plaque, { type: 'read', doc: 'roof_plaque', label: t('lbl.castPlate', 'A cast plate') });
 
     const ae = P.cyl(0.03, 3.2, MAT.metal(true), -9, y + 1.6, -6);
     g.add(ae);
@@ -791,7 +792,7 @@ export class Building {
     ch.position.set(-4.4, y, -6.2);
     ch.rotation.y = 0.8;
     this.addMesh(lv, ch, { solid: true });
-    this.interact(ch, { type: 'examine', text: 'A kitchen chair, brought up here and left facing the city. The seat is worn smooth. Someone sat here a great many times, watching the lights go out one district at a time.' });
+    this.interact(ch, { type: 'examine', text: t('ex.roofChair', 'A kitchen chair, brought up here and left facing the city. The seat is worn smooth. Someone sat here a great many times, watching the lights go out one district at a time.') });
 
     // roof lighting: only the doorway lamp and the sky
     this.registerEmitter({

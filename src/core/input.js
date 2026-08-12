@@ -1,5 +1,7 @@
 // ── keyboard / mouse / pointer-lock ─────────────────────────────────────
 import { $ } from './util.js';
+import { TIERS, TIER_ORDER, normaliseTier } from './quality.js';
+import { LANGS, t } from './i18n.js';
 
 export class Input {
   constructor(canvas, settings) {
@@ -102,12 +104,13 @@ const DEFAULTS = {
   fov: 74,
   volume: 0.7,
   brightness: 1.0,
-  quality: 0.85,
+  quality: 'high',
   bob: 1.0,
   grain: 1.0,
   invertY: false,
   subtitles: true,
   reduceFlashing: false,
+  lang: 'en',
 };
 
 export function loadSettings() {
@@ -115,6 +118,7 @@ export function loadSettings() {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) s = { ...s, ...JSON.parse(raw) };
+    s.quality = normaliseTier(s.quality);   // older saves stored a bare render scale
   } catch { /* private mode, corrupt json — defaults are fine */ }
   return s;
 }
@@ -143,10 +147,19 @@ export function bindSettingsUI(settings, onChange) {
     });
   }
   const q = $('#set-quality');
-  q.value = String(settings.quality);
+  q.innerHTML = TIER_ORDER.map((k) => `<option value="${k}">${t(`quality.${k}`, TIERS[k].label)}</option>`).join('');
+  q.value = normaliseTier(settings.quality);
   q.addEventListener('change', () => {
-    settings.quality = parseFloat(q.value); saveSettings(settings); onChange?.('quality');
+    settings.quality = q.value; saveSettings(settings); onChange?.('quality');
   });
+  const lg = $('#set-lang');
+  if (lg) {
+    lg.innerHTML = Object.entries(LANGS).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('');
+    lg.value = settings.lang || 'en';
+    lg.addEventListener('change', () => {
+      settings.lang = lg.value; saveSettings(settings); onChange?.('lang');
+    });
+  }
   for (const [sel, key] of [['#set-invert', 'invertY'], ['#set-subs', 'subtitles'], ['#set-flash', 'reduceFlashing']]) {
     const c = $(sel);
     c.checked = !!settings[key];

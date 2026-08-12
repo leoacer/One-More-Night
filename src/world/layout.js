@@ -136,7 +136,7 @@ export const ROOMS = [
   R({ id: '402', lv: 3, side: 's', slot: 0, name: 'Apartment 402', kind: 'apartment',
       lock: 'locked', furnish: 'empty', door: 'door', plate: '402', floor: 'wood' }),
   R({ id: '404', lv: 3, side: 's', slot: 1, name: 'Apartment 404', kind: 'apartment',
-      lock: 'open', furnish: 'records', door: 'doorGreen', plate: '404', floor: 'wood' }),
+      lock: 'locked', furnish: 'records', door: 'doorGreen', plate: '404', floor: 'wood' }),
   R({ id: '406', lv: 3, side: 's', slot: 2, name: 'Apartment 406', kind: 'apartment',
       lock: 'locked', furnish: 'empty', door: 'door', plate: '406', floor: 'wood' }),
 ];

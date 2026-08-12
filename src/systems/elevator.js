@@ -105,8 +105,11 @@ export class Elevator {
       case 'open': {
         this.hold -= dt;
         if (this.hold <= 0 && !this.forcedOpen) {
-          if (this.contains(playerPos) || this.queue.length) this.state = 'closing';
-          else if (this.hold < -12) this.state = 'closing';
+          // Somebody standing in the car has not chosen a floor yet, so
+          // hold the doors for them. Close once they leave, or once a
+          // destination is actually queued.
+          if (this.queue.length) this.state = 'closing';
+          else if (!this.contains(playerPos)) this.state = 'closing';
         }
         break;
       }

@@ -84,6 +84,14 @@ export class Player {
     this.right = new THREE.Vector3();
   }
 
+  /** Re-point the torch shadow at a new resolution. */
+  setShadowQuality(size, coneOn) {
+    this.spot.shadow.mapSize.set(size, size);
+    if (this.spot.shadow.map) { this.spot.shadow.map.dispose(); this.spot.shadow.map = null; }
+    this.coneEnabled = coneOn !== false;
+    if (!this.coneEnabled) this.cone.visible = false;
+  }
+
   addToScene(scene) {
     scene.add(this.spot);
     scene.add(this.spotTarget);
@@ -341,7 +349,7 @@ export class Player {
     // volumetric cone follows the beam
     const len = this.spot.distance * 0.8;
     const rad = Math.tan(this.spot.angle) * len;
-    this.cone.visible = this.torchFail > 0.03;
+    this.cone.visible = this.coneEnabled !== false && this.torchFail > 0.03;
     if (this.cone.visible) {
       this.cone.position.copy(this.spot.position);
       this.cone.lookAt(this.spotTarget.position);

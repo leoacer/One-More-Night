@@ -120,6 +120,7 @@ export class Reader {
   render(docId) {
     const doc = DOCS[docId];
     if (!doc) return false;
+    this.docId = docId;
     this.title.textContent = doc.title;
     this.sheet.classList.toggle('tape', doc.type === 'tape');
     let html = '';

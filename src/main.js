@@ -8,6 +8,9 @@ import { Input, loadSettings, bindSettingsUI } from './core/input.js';
 import { AudioEngine } from './core/audio.js';
 import { PostFX } from './core/postfx.js';
 import { TX } from './core/textures.js';
+import { TIERS, TIER_ORDER, tierOf, normaliseTier } from './core/quality.js';
+import { t, setLanguage, registerPack, LANGS, lang } from './core/i18n.js';
+import svPack from './data/locales/sv/index.js';
 import * as ST from './core/state.js';
 
 import { GEO, ROOF_LEVEL, ROOMS, HOME_ID, levelY, slotBounds } from './world/layout.js';
@@ -30,6 +33,27 @@ import { NIGHTS, makeNightPlan, ambienceFor } from './data/nights.js';
 import { DIALOGUE, NPC_DEFS } from './data/dialogue.js';
 import { DOCS } from './data/lore.js';
 import { ITEMS, COMBOS } from './data/items.js';
+
+// English source for the per-night window and mirror lines; the localiser
+// overrides these by key (ui.window.N / ui.mirror.N).
+const WINDOW_EN = [
+  'Rain on the glass, and behind it a city with almost no lights in it. Three windows burning in the whole northern district. You count them every night and it is always three.',
+  'The street below is empty and shining. No cars have moved on it since the outage. The puddles have not been disturbed by anything.',
+  'A window across the street lights up while you are watching, and goes out again, and lights up. Someone is signalling, or a fuse is failing. You cannot tell which and it matters.',
+  'The building opposite is closer than it was. Not much. Enough that you can see the pattern on somebody\'s curtains.',
+  'You cannot see the ground. There is a street down there and you have walked on it, and tonight the window shows you a courtyard you have never seen, with a chair in the middle of it.',
+  'Your own reflection is late. It arrives about a third of a second after you move, and it is watching the room rather than the street.',
+  'There is no city. There is rain, and there is the light from this window falling on rain, and beyond that the rain simply continues.',
+];
+const MIRROR_EN = [
+  'You look tired. That is all. It is a relief and you are embarrassed about how much of one.',
+  'You look tired. Behind you, the door of your own apartment is closed. You left it open.',
+  'You look tired, and slightly wrong, in the way of a photograph of yourself taken by somebody else.',
+  'Your reflection blinks first.',
+  'The room in the mirror has two plates on the table. The room you are standing in has one.',
+  'You are not in it. The room is, perfectly, down to the grain of the wallpaper. You are not.',
+  'It is a photograph now. Sepia, cracked, and it has been on this wall for a very long time, and you are in it, at the left edge, being scratched out with a pin.',
+];
 
 const NIGHT_SECONDS = ST.NIGHT_SECONDS;
 
@@ -57,7 +81,7 @@ class Game {
   async boot() {
     if (!this.initRenderer()) return;
     this.audio = new AudioEngine(this.settings);
-    this.audio.onSubtitle = (t) => this.hud.say(t, null, 'sfx', 2.6);
+    this.audio.onSubtitle = (line) => this.hud.say(line, null, 'sfx', 2.6);
 
     this.input = new Input(this.canvas, this.settings);
     this.hud = new Hud();
@@ -75,6 +99,9 @@ class Game {
     this.npcs = new NpcSystem(this.scene, this.audio);
     this.director = new Director(this);
 
+    registerPack('sv', svPack);
+    setLanguage(this.settings.lang || 'en');
+    this.applyQuality();
     this.bindUI();
     this.refreshMenu();
 
@@ -117,6 +144,25 @@ class Game {
     return true;
   }
 
+  /**
+   * Push the current quality tier through every subsystem. Texture size is
+   * the one knob that cannot change under a built world, so it is applied
+   * here but only becomes visible once the next night is generated.
+   */
+  applyQuality() {
+    const tier = tierOf(this.settings);
+    const texChanged = TX.setQuality(tier.tex, tier.aniso);
+    this.player?.setShadowQuality(tier.shadow, tier.cone);
+    this.lights?.setPoolSize(tier.pool);
+    this.renderer.shadowMap.enabled = tier.shadows;
+    this.resize();
+    if (texChanged && this.building) {
+      MAT.dispose();          // materials point at canvases that no longer exist
+      const name = t(`quality.${normaliseTier(this.settings.quality)}`, tier.label);
+      this.hud.toast(t('m.textureRebuild', '<b>{tier}.</b> Textures rebuild on the next night.').replace('{tier}', name));
+    }
+  }
+
   resize() {
     const w = window.innerWidth, h = window.innerHeight;
     this.renderer.setSize(w, h, false);
@@ -156,7 +202,7 @@ class Game {
     act('#pause', (a) => {
       if (a === 'resume') this.setPaused(false);
       else if (a === 'settings') { $('#pause').classList.add('hidden'); $('#settings').classList.remove('hidden'); this.settingsBack = 'pause'; }
-      else if (a === 'save') { ST.save(this.state, 'manual'); this.hud.toast('<b>Saved.</b> The night is remembered.'); this.setPaused(false); }
+      else if (a === 'save') { ST.save(this.state, 'manual'); this.hud.toast(t('m.saved', '<b>Saved.</b> The night is remembered.')); this.setPaused(false); }
       else if (a === 'quit') this.abandonNight();
     });
     act('#settings', (a) => {
@@ -169,7 +215,8 @@ class Game {
 
     bindSettingsUI(this.settings, (key) => {
       if (key === 'fov') { this.camera.fov = this.settings.fov; this.camera.updateProjectionMatrix(); }
-      if (key === 'quality') this.resize();
+      if (key === 'quality') this.applyQuality();
+      if (key === 'lang') this.setLanguage(this.settings.lang);
       if (key === 'volume') this.audio.setVolume(this.settings.volume);
     });
 
@@ -194,13 +241,42 @@ class Game {
     });
   }
 
+  /** Switch language and re-render anything already on screen. */
+  setLanguage(code) {
+    setLanguage(code);
+    this.refreshMenu();
+    // the quality dropdown bakes its option labels in at bind time
+    const q = $('#set-quality');
+    if (q) {
+      const was = q.value;
+      q.innerHTML = TIER_ORDER.map((k) => `<option value="${k}">${t(`quality.${k}`, TIERS[k].label)}</option>`).join('');
+      q.value = was;
+    }
+    if (this.inventory.open) this.inventory.render();
+    if (this.journal.open) this.journal.render();
+    if (this.dialogue.open) this.dialogue.goto(this.dialogue.nodeId);
+    if (this.reader.open) this.reader.render(this.reader.docId);
+    if (this.mode === 'card') this.showNightCard();
+    if (this.mode === 'ending' && this.state.ending) {
+      $('#end-title').textContent = ENDINGS[this.state.ending].title;
+      $('#end-body').textContent = ENDINGS[this.state.ending].body;
+      this.fillEndingStats();
+    }
+    if (this.mode === 'night') {
+      this.hud.toast(t('m.langChanged', '<b>{lang}.</b> The language applies immediately.')
+        .replace('{lang}', LANGS[code]?.name || code));
+    }
+  }
+
   refreshMenu() {
     const info = ST.saveInfo();
     const btn = $('#btn-continue');
     btn.disabled = !info;
     $('#mm-save-info').textContent = info
-      ? `Saved on night ${info.night} · ${info.evidence} pieces of evidence · ${info.when.toLocaleDateString()}`
-      : 'No saved night.';
+      ? t('ui.savedOnNight', 'Saved on night {n} · {e} pieces of evidence · {d}')
+        .replace('{n}', info.night).replace('{e}', info.evidence)
+        .replace('{d}', info.when.toLocaleDateString(lang() === 'sv' ? 'sv-SE' : 'en-GB'))
+      : t('ui.noSave', 'No saved night.');
   }
 
   anyPanelOpen() {
@@ -265,11 +341,11 @@ class Game {
     const fill = $('#load-fill');
     const text = $('#load-text');
     const steps = [
-      ['Rebuilding the building…', () => { this.plan = makeNightPlan(this.state); }],
-      ['Hanging the wallpaper…', () => { this.buildWorld(); }],
-      ['Turning off the lights…', () => { this.applyPlan(); }],
-      ['Waking the residents…', () => { this.npcs.spawnFromPlan(this.plan, this.building); }],
-      ['Winding the watch…', () => { this.prepareNight(); }],
+      [t('ui.load.rebuild', 'Rebuilding the building…'), () => { this.plan = makeNightPlan(this.state); }],
+      [t('ui.load.wallpaper', 'Hanging the wallpaper…'), () => { this.buildWorld(); }],
+      [t('ui.load.lights', 'Turning off the lights…'), () => { this.applyPlan(); }],
+      [t('ui.load.residents', 'Waking the residents…'), () => { this.npcs.spawnFromPlan(this.plan, this.building); }],
+      [t('ui.load.watch', 'Winding the watch…'), () => { this.prepareNight(); }],
     ];
     for (let i = 0; i < steps.length; i++) {
       text.textContent = steps[i][0];
@@ -351,11 +427,11 @@ class Game {
 
   showNightCard() {
     const n = this.state.night;
-    const info = NIGHTS[n] || { eyebrow: `NIGHT ${n}`, title: 'Again', text: '' };
+    const info = NIGHTS[n] || { eyebrow: `${t('ui.nightShort', 'NIGHT')} ${n}`, title: t('ui.again', 'Again'), text: '' };
     $('#nc-eyebrow').textContent = info.eyebrow;
     $('#nc-title').textContent = info.title;
     $('#nc-text').textContent = info.text;
-    $('#nc-btn').textContent = n === 1 ? 'Leave the apartment' : 'Go out';
+    $('#nc-btn').textContent = n === 1 ? t('ui.leaveApartment', 'Leave the apartment') : t('ui.goOut', 'Go out');
     $('#nightcard').classList.remove('hidden');
     this.mode = 'card';
     ST.save(this.state, `night-${n}-start`);
@@ -371,9 +447,9 @@ class Game {
     this.input.lock();
     this.audio.init();
     this.audio.setVolume(this.settings.volume);
-    this.hud.toast('<b>Ten minutes.</b> Be back behind your own door.');
+    this.hud.toast(t('m.tenMinutes', '<b>Ten minutes.</b> Be back behind your own door.'));
     if (this.state.night === 1) {
-      setTimeout(() => this.hud.toast('Press <b>F</b> for the torch, <b>E</b> to interact, <b>J</b> for your journal.'), 4200);
+      setTimeout(() => this.hud.toast(t('m.controls', 'Press <b>F</b> for the torch, <b>E</b> to interact, <b>J</b> for your journal.')), 4200);
     }
   }
 
@@ -392,31 +468,35 @@ class Game {
       if (this.state.night >= ST.MAX_NIGHT) { this.showEnding('lost'); return; }
       this.state.health = Math.max(1, this.state.health - 26);
       ST.addJournal(this.state, {
-        cat: 'events', title: 'I did not get back in time',
-        text: 'The ten minutes ended while I was still in the corridor. I do not have the part after that. I woke up on my own floor with the door shut behind me and my hands filthy.',
+        cat: 'events',
+        title: t('j.lateBack.t', 'I did not get back in time'),
+        text: t('j.lateBack.x', 'The ten minutes ended while I was still in the corridor. I do not have the part after that. I woke up on my own floor with the door shut behind me and my hands filthy.'),
       });
-      this.hud.toast('<b>You lost the end of the night.</b>', 'warn');
+      this.hud.toast(t('m.lostEndOfNight', '<b>You lost the end of the night.</b>'), 'warn');
     }
     this.showSummary(how);
   }
 
   showSummary(how) {
     const st = this.state;
-    $('#sum-title').textContent = `Night ${st.night} — ${NIGHTS[st.night]?.title || ''}`;
+    $('#sum-title').textContent = `${t('ui.nightWord', 'Night')} ${st.night} — ${NIGHTS[st.night]?.title || ''}`;
     const fill = (sel, list) => {
       const n = $(sel);
       n.innerHTML = '';
-      if (!list.length) { n.appendChild(el('li', 'none', 'Nothing.')); return; }
-      for (const t of list.slice(0, 6)) n.appendChild(el('li', '', esc(t)));
+      if (!list.length) { n.appendChild(el('li', 'none', t('ui.nothing', 'Nothing.'))); return; }
+      for (const line of list.slice(0, 6)) n.appendChild(el('li', '', esc(line)));
     };
     const foundTonight = st.journal.entries.filter((e) => e.night === st.night && e.cat === 'evidence').map((e) => e.title);
     const noticed = st.changesNoticed.slice(-6);
-    const people = st.metNpcs.map((id) => `${NPC_DEFS[id].short} — ${ST.trustLabel(st.trust[id] || 0)}`);
+    const people = st.metNpcs.map((id) => {
+      const lbl = ST.trustLabel(st.trust[id] || 0);
+      return `${NPC_DEFS[id].short} — ${t(`trust.${lbl}`, lbl)}`;
+    });
     fill('#sum-found', foundTonight);
     fill('#sum-noticed', noticed);
     fill('#sum-people', people);
     $('#sum-note').value = '';
-    $('#sum-btn').textContent = st.night >= ST.MAX_NIGHT ? 'Sleep — if you can' : 'Sleep';
+    $('#sum-btn').textContent = st.night >= ST.MAX_NIGHT ? t('ui.sleepIfYouCan', 'Sleep — if you can') : t('ui.sleep', 'Sleep');
     $('#summary').classList.remove('hidden');
     void how;
   }
@@ -438,7 +518,7 @@ class Game {
     else st.health = clamp(st.health + 8, 0, 100);
     st.battery = this.player.battery;
 
-    if (st.health <= 1 && st.food <= 0) { this.die('You went to sleep hungry once too often.'); return; }
+    if (st.health <= 1 && st.food <= 0) { this.die(t('x.diedHungry', 'You went to sleep hungry once too often.')); return; }
 
     if (st.night >= ST.MAX_NIGHT) { this.showEnding('stayed'); return; }
     st.night++;
@@ -471,11 +551,15 @@ class Game {
     this.hud.hide();
     $('#end-title').textContent = e.title;
     $('#end-body').textContent = e.body;
+    this.fillEndingStats();
+    $('#ending').classList.remove('hidden');
+    this.refreshMenu();
+  }
+
+  fillEndingStats() {
     const stats = $('#end-stats');
     stats.innerHTML = '';
     for (const s of endingStats(this.state)) stats.appendChild(el('div', 'st', `${esc(s.k)} <b>${esc(s.v)}</b>`));
-    $('#ending').classList.remove('hidden');
-    this.refreshMenu();
   }
 
   setPaused(v) {
@@ -483,7 +567,22 @@ class Game {
     this.paused = v;
     $('#pause').classList.toggle('hidden', !v);
     if (v) { this.input.unlock(); this.audio.suspend(); }
-    else { this.audio.resume(); this.input.lock(); }
+    else {
+      this.audio.resume();
+      // Browsers refuse pointer lock for about a second after Escape
+      // released it, which would leave the game running with no mouse
+      // look and no way to notice. Retry, then tell the player to click.
+      this.input.lock();
+      clearTimeout(this._relock);
+      let tries = 0;
+      const retry = () => {
+        if (this.paused || this.mode !== 'night' || this.input.locked) return;
+        if (++tries > 6) { this.hud.toast(t('m.clickForMouse', 'Click to take back the mouse.')); return; }
+        this.input.lock();
+        this._relock = setTimeout(retry, 300);
+      };
+      this._relock = setTimeout(retry, 300);
+    }
   }
 
   // ══════════════════ main loop ══════════════════
@@ -524,8 +623,8 @@ class Game {
     const remaining = Math.max(0, NIGHT_SECONDS - this.elapsed);
     this.hud.setWatch(remaining, this.state.night, true);
     if (remaining <= 0) { this.endNight('timeout'); return; }
-    if (!this._warned3 && remaining < 180) { this._warned3 = true; this.hud.toast('Three minutes.', 'warn'); this.hud.peekWatch(); }
-    if (!this._warned1 && remaining < 60) { this._warned1 = true; this.hud.toast('<b>One minute.</b> Get back.', 'warn'); this.hud.peekWatch(); this.audio.play('heartbeat', { volume: 0.4 }); }
+    if (!this._warned3 && remaining < 180) { this._warned3 = true; this.hud.toast(t('m.threeMinutes', 'Three minutes.'), 'warn'); this.hud.peekWatch(); }
+    if (!this._warned1 && remaining < 60) { this._warned1 = true; this.hud.toast(t('m.oneMinute', '<b>One minute.</b> Get back.'), 'warn'); this.hud.peekWatch(); this.audio.play('heartbeat', { volume: 0.4 }); }
 
     // safety net: if the world ever loses the player, put them back in the
     // basement corridor rather than let them fall out of the building
@@ -533,7 +632,7 @@ class Game {
       this.player.teleport(0, levelY(-1), 0, this.player.yaw);
       this.state.health = clamp(this.state.health - 10, 1, 100);
       this.hud.damage();
-      this.hud.say('You came down harder than you should have, and you cannot account for the last few seconds.', null, 'sfx', 4);
+      this.hud.say(t('x.fell', 'You came down harder than you should have, and you cannot account for the last few seconds.'), null, 'sfx', 4);
     }
 
     const camDir = this.player.fwd;
@@ -572,7 +671,7 @@ class Game {
     // ── vitals
     if (this.state.food > 0) this.state.food = clamp(this.state.food - dt * 0.32, 0, 100);
     else this.state.health = clamp(this.state.health - dt * 0.5, 0, 100);
-    if (this.state.health <= 0) { this.die('Your body gave out somewhere between the third floor and your own front door.'); return; }
+    if (this.state.health <= 0) { this.die(t('x.diedExhausted', 'Your body gave out somewhere between the third floor and your own front door.')); return; }
     this.hud.setVitals(this.state.health, this.state.food);
     this.hud.setTorch(this.player.torchOn, this.player.battery);
     this.hud.update(dt);
@@ -653,12 +752,13 @@ class Game {
   noticeLoop() {
     if (this._loopNoted) return;
     this._loopNoted = true;
-    this.hud.say('You have walked the length of this corridor and arrived at the beginning of it.', null, 'sfx', 5);
+    this.hud.say(t('x.corridorLoops', 'You have walked the length of this corridor and arrived at the beginning of it.'), null, 'sfx', 5);
     ST.addJournal(this.state, {
-      cat: 'events', title: 'The corridor has no ends tonight',
-      text: 'Walking east on the first and second floors puts me back at the west end. The doors are in the same order. The stairwell is where it always was, and I cannot walk to it.',
+      cat: 'events',
+      title: t('j.loop.t', 'The corridor has no ends tonight'),
+      text: t('j.loop.x', 'Walking east on the first and second floors puts me back at the west end. The doors are in the same order. The stairwell is where it always was, and I cannot walk to it.'),
     });
-    ST.noteChange(this.state, 'The corridors loop back on themselves.');
+    ST.noteChange(this.state, t('j.loop.n', 'The corridors loop back on themselves.'));
   }
 
   updateDynamics(dt) {
@@ -720,10 +820,11 @@ class Game {
       if (!this._sawFollower) {
         this._sawFollower = true;
         ST.addJournal(this.state, {
-          cat: 'events', title: 'There is someone in the corridor with me',
-          text: 'It stands still when I look at it. It does not stand still when I do not. It is my height.',
+          cat: 'events',
+          title: t('j.follower.t', 'There is someone in the corridor with me'),
+          text: t('j.follower.x', 'It stands still when I look at it. It does not stand still when I do not. It is my height.'),
         });
-        this.hud.say('It is standing at the end of the corridor. It is your height.', null, 'sfx', 4);
+        this.hud.say(t('x.itIsThere', 'It is standing at the end of the corridor. It is your height.'), null, 'sfx', 4);
       }
     }
   }
@@ -734,15 +835,15 @@ class Game {
     this.hud.damage();
     this.audio.play('stinger', { volume: 0.5 });
     this.audio.play('breath', { volume: 0.6 });
-    this.hud.toast('<b>It reached you.</b> You cannot say what happened next.', 'warn');
+    this.hud.toast(t('m.itReachedYou', '<b>It reached you.</b> You cannot say what happened next.'), 'warn');
     // it takes something, and it is never the important thing
     const droppable = this.state.inventory.filter((s) => ITEMS[s.id] && ITEMS[s.id].kind === 'consumable');
     if (droppable.length && Math.random() < 0.6) {
       const s = droppable[Math.floor(Math.random() * droppable.length)];
       ST.removeItem(this.state, s.id, 1);
-      this.hud.toast(`Something of yours is gone: <b>${esc(ITEMS[s.id].name)}</b>.`, 'warn');
+      this.hud.toast(t('m.somethingGone', 'Something of yours is gone: <b>{name}</b>.').replace('{name}', esc(ITEMS[s.id].name)), 'warn');
     }
-    if (this.state.health <= 0) this.die('Whatever has been walking behind you finally caught up.');
+    if (this.state.health <= 0) this.die(t('x.diedCaught', 'Whatever has been walking behind you finally caught up.'));
   }
 
   // ══════════════════ interaction ══════════════════
@@ -760,7 +861,7 @@ class Game {
     if (npc) {
       const to = new THREE.Vector3().subVectors(npc.pos, this.player.pos).normalize();
       if (to.dot(this.player.fwd) > 0.55) {
-        target = { kind: 'npc', npc, label: `Talk to ${NPC_DEFS[npc.id].short}` };
+        target = { kind: 'npc', npc, label: t('p.talkTo', 'Talk to {name}').replace('{name}', NPC_DEFS[npc.id].short) };
       }
     }
 
@@ -799,38 +900,38 @@ class Game {
       case 'door': {
         const d = this.building.doors.get(data.doorId);
         if (!d) return null;
-        if (d.sealed) return { text: 'Sealed shut', locked: true };
+        if (d.sealed) return { text: t('p.sealed', 'Sealed shut'), locked: true };
         if (d.locked) {
           const key = d.keyItem;
-          if (key && ST.hasItem(st, key)) return { text: `Unlock with ${ITEMS[key]?.name || 'key'}` };
-          if (!key && ST.hasItem(st, 'key_office')) return { text: "Try the caretaker's keys" };
-          return { text: 'Locked', locked: true };
+          if (key && ST.hasItem(st, key)) return { text: t('p.unlockWith', 'Unlock with {name}').replace('{name}', ITEMS[key]?.name || 'key') };
+          if (ST.hasItem(st, 'key_office')) return { text: t('p.tryKeys', "Try the caretaker's keys") };
+          return { text: t('p.locked', 'Locked'), locked: true };
         }
-        return { text: d.open ? 'Close' : 'Open' };
+        return { text: d.open ? t('p.close', 'Close') : t('p.open', 'Open') };
       }
-      case 'item': return { text: `Take ${data.label || ITEMS[data.item]?.name || 'it'}` };
-      case 'read': return { text: data.label || 'Read' };
-      case 'examine': return { text: 'Look closer' };
-      case 'sleep': return { text: this.plan.allowSleepEarly || this.elapsed > NIGHT_SECONDS - 60 ? 'Go to bed' : 'Not yet' };
-      case 'journal_desk': return { text: 'Your journal' };
-      case 'larder': return { text: this.usedThisNight.has('larder') ? 'Empty' : 'Search the larder' };
-      case 'lightswitch': return { text: 'Switch the lamp' };
-      case 'elev_call': return { text: 'Call the lift' };
-      case 'elev_button': return { text: `Press ${data.label}` };
-      case 'window': return { text: 'Look outside' };
-      case 'mirror': return { text: 'Look at yourself' };
-      case 'newdoor': return { text: 'The door with no number', locked: true };
-      case 'newdoor_final': return { text: 'Open it' };
-      case 'frontdoor': return { text: this.canLeaveByFront() ? 'Lift the chain' : 'The front door' };
-      case 'workbench': return { text: this.usedThisNight.has('bench') ? "Tomas's bench" : 'Service the torch' };
-      case 'washer': return { text: 'Open the drum' };
-      case 'filecabinet': return { text: ST.hasItem(st, 'key_office') ? 'Unlock the cabinet' : 'Locked cabinet', locked: !ST.hasItem(st, 'key_office') };
-      case 'keyboard_rack': return { text: ST.hasItem(st, 'key_office') ? 'Keys' : 'Take the keys' };
-      case 'fusebox': return { text: ST.hasItem(st, 'fuse') ? 'Fit a fuse' : 'Fuse box' };
-      case 'breaker': return { text: 'Throw the breaker' };
-      case 'valve': return { text: 'Turn the valve' };
-      case 'painting': return { text: 'Look at the picture' };
-      default: return root?.userData.interact?.text ? { text: 'Look closer' } : null;
+      case 'item': return { text: t('p.take', 'Take {name}').replace('{name}', ITEMS[data.item]?.name || data.label || 'it') };
+      case 'read': return { text: data.label || t('p.read', 'Read') };
+      case 'examine': return { text: t('p.lookCloser', 'Look closer') };
+      case 'sleep': return { text: this.plan.allowSleepEarly || this.elapsed > NIGHT_SECONDS - 60 ? t('p.goToBed', 'Go to bed') : t('p.notYet', 'Not yet') };
+      case 'journal_desk': return { text: t('p.yourJournal', 'Your journal') };
+      case 'larder': return { text: this.usedThisNight.has('larder') ? t('p.empty', 'Empty') : t('p.searchLarder', 'Search the larder') };
+      case 'lightswitch': return { text: t('p.switchLamp', 'Switch the lamp') };
+      case 'elev_call': return { text: t('p.callLift', 'Call the lift') };
+      case 'elev_button': return { text: t('p.press', 'Press {label}').replace('{label}', data.label) };
+      case 'window': return { text: t('p.lookOutside', 'Look outside') };
+      case 'mirror': return { text: t('p.lookAtYourself', 'Look at yourself') };
+      case 'newdoor': return { text: t('p.numberlessDoor', 'The door with no number'), locked: true };
+      case 'newdoor_final': return { text: t('p.openIt', 'Open it') };
+      case 'frontdoor': return { text: this.canLeaveByFront() ? t('p.liftChain', 'Lift the chain') : t('p.frontDoor', 'The front door') };
+      case 'workbench': return { text: this.usedThisNight.has('bench') ? t('p.bench', "Tomas's bench") : t('p.serviceTorch', 'Service the torch') };
+      case 'washer': return { text: t('p.openDrum', 'Open the drum') };
+      case 'filecabinet': return { text: ST.hasItem(st, 'key_office') ? t('p.unlockCabinet', 'Unlock the cabinet') : t('p.lockedCabinet', 'Locked cabinet'), locked: !ST.hasItem(st, 'key_office') };
+      case 'keyboard_rack': return { text: ST.hasItem(st, 'key_office') ? t('p.keys', 'Keys') : t('p.takeKeys', 'Take the keys') };
+      case 'fusebox': return { text: ST.hasItem(st, 'fuse') ? t('p.fitFuse', 'Fit a fuse') : t('p.fuseBox', 'Fuse box') };
+      case 'breaker': return { text: t('p.throwBreaker', 'Throw the breaker') };
+      case 'valve': return { text: t('p.turnValve', 'Turn the valve') };
+      case 'painting': return { text: t('p.lookAtPicture', 'Look at the picture') };
+      default: return root?.userData.interact?.text ? { text: t('p.lookCloser', 'Look closer') } : null;
     }
   }
 
@@ -846,7 +947,7 @@ class Game {
         return;
       case 'sleep': {
         if (!this.plan.allowSleepEarly && this.elapsed < NIGHT_SECONDS - 60) {
-          this.hud.say('Not tonight. Tonight you finish it.', null, 'sfx', 3.5);
+          this.hud.say(t('x.notTonight', 'Not tonight. Tonight you finish it.'), null, 'sfx', 3.5);
           return;
         }
         this.audio.play('door_close', { volume: 0.4 });
@@ -863,7 +964,7 @@ class Game {
       }
       case 'elev_call': {
         this.elevator.call(data.lv);
-        this.hud.say('Somewhere in the shaft, something heavy begins to move.', null, 'sfx', 2.6);
+        this.hud.say(t('x.liftMoving', 'Somewhere in the shaft, something heavy begins to move.'), null, 'sfx', 2.6);
         return;
       }
       case 'elev_button': return this.pressElevator(data.lv, data.label);
@@ -884,13 +985,13 @@ class Game {
           if (e.lv === lv && e.id.startsWith('cor_')) { e.on = !e.on; e.broken = false; n++; }
         }
         this.audio.play('zap', { volume: 0.5 });
-        this.hud.say(`${n} circuits. They all still work, which is the part nobody wants to talk about.`, null, 'sfx', 4);
+        this.hud.say(t('x.circuits', '{n} circuits. They all still work, which is the part nobody wants to talk about.').replace('{n}', n), null, 'sfx', 4);
         return;
       }
       case 'valve':
         this.audio.play('pipe_clank', { pos: this.player.head, volume: 0.6 });
         this.audio.play('creak', { volume: 0.4, delay: 0.4 });
-        this.hud.say('The valve turns easily. Somewhere above you, a long way above you, water begins to move.', null, 'sfx', 4);
+        this.hud.say(t('x.valve', 'The valve turns easily. Somewhere above you, a long way above you, water begins to move.'), null, 'sfx', 4);
         return;
       case 'painting': return this.lookAtPainting(data.roomId, root);
       default:
@@ -906,7 +1007,7 @@ class Game {
     if (!d) return;
     if (d.sealed) {
       this.audio.play('door_locked', { pos: d.creakPos, volume: 0.6 });
-      this.hud.say('Boarded from this side, and the boards are old. Nobody has opened this in years.', null, 'sfx', 4);
+      this.hud.say(t('x.boardedShut', 'Boarded from this side, and the boards are old. Nobody has opened this in years.'), null, 'sfx', 4);
       return;
     }
     if (d.locked) {
@@ -914,18 +1015,19 @@ class Game {
       if (key && ST.hasItem(this.state, key)) {
         d.locked = false;
         this.audio.play('click', { pos: d.creakPos, volume: 0.7 });
-        this.hud.toast(`Unlocked with the <b>${esc(ITEMS[key].name)}</b>.`);
+        this.hud.toast(t('m.unlockedWith', 'Unlocked with the <b>{name}</b>.').replace('{name}', esc(ITEMS[key].name)));
         ST.setFlag(this.state, `${id}_unlocked`);
         return;
       }
-      if (!key && ST.hasItem(this.state, 'key_office')) {
+      // Halvard's ring is a master: "Office, cabinets, everything."
+      if (ST.hasItem(this.state, 'key_office')) {
         d.locked = false;
         this.audio.play('click', { pos: d.creakPos, volume: 0.7 });
-        this.hud.toast("One of the caretaker's keys fits.");
+        this.hud.toast(t('m.caretakerKeyFits', "One of the caretaker's keys fits."));
         return;
       }
       this.audio.play('door_locked', { pos: d.creakPos, volume: 0.7 });
-      this.hud.say('Locked. The handle moves about a centimetre and stops.', null, 'sfx', 3);
+      this.hud.say(t('x.lockedHandle', 'Locked. The handle moves about a centimetre and stops.'), null, 'sfx', 3);
       return;
     }
     const open = d.toggle();
@@ -939,7 +1041,7 @@ class Game {
     if (!def) return;
     const qty = data.qty || 1;
     if (!ST.addItem(st, id, qty)) {
-      this.hud.say('You already have one, and one is enough.', null, 'sfx', 2.6);
+      this.hud.say(t('m.alreadyHaveOne', 'You already have one, and one is enough.'), null, 'sfx', 2.6);
       return;
     }
     this.audio.play('pickup', { pos: root.position.clone(), volume: 0.6 });
@@ -956,7 +1058,7 @@ class Game {
     const st = this.state;
     if (!st.docsRead.includes(docId)) st.docsRead.push(docId);
     if (doc.ev && ST.addEvidence(st, docId)) {
-      this.hud.toast(`<b>Evidence.</b> ${esc(doc.title)}`, 'evidence');
+      this.hud.toast(t('m.evidence', '<b>Evidence.</b> {title}').replace('{title}', esc(doc.title)), 'evidence');
       ST.save(st, 'discovery');
     }
     if (doc.journal) ST.addJournal(st, { ...doc.journal, id: `doc:${docId}` });
@@ -969,7 +1071,7 @@ class Game {
 
   searchLarder() {
     if (this.usedThisNight.has('larder')) {
-      this.hud.say('Empty. You have been through it twice tonight.', null, 'sfx', 3);
+      this.hud.say(t('x.larderEmpty', 'Empty. You have been through it twice tonight.'), null, 'sfx', 3);
       return;
     }
     this.usedThisNight.add('larder');
@@ -977,60 +1079,52 @@ class Game {
     const rng = makeRng(`larder-${this.state.night}-${this.state.seed}`);
     if (rng.chance(0.75)) {
       ST.addItem(this.state, 'food', 1);
-      this.hud.toast('<b>Tinned Food</b> — one more than you remembered having.');
+      this.hud.toast(t('x.larderFound', '<b>Tinned Food</b> — one more than you remembered having.'));
     } else {
-      this.hud.say('Nothing. You are certain there were two tins.', null, 'sfx', 3.4);
-      ST.noteChange(this.state, 'Food is missing from my own larder.');
+      this.hud.say(t('x.larderGone', 'Nothing. You are certain there were two tins.'), null, 'sfx', 3.4);
+      ST.noteChange(this.state, t('n.larderShort', 'Food is missing from my own larder.'));
     }
   }
 
   pressElevator(lv, label) {
     const res = this.elevator.press(lv);
     if (res.refused) {
-      this.hud.say('The button for four does not light. There is no four.', null, 'sfx', 3.4);
+      this.hud.say(t('x.noFourth', 'The button for four does not light. There is no four.'), null, 'sfx', 3.4);
       return;
     }
     if (res.lied) {
-      this.hud.say(`You press ${label}.`, null, 'sfx', 2.2);
-      ST.noteChange(this.state, 'The lift does not go where the buttons say.');
+      this.hud.say(t('x.youPress', 'You press {label}.').replace('{label}', label), null, 'sfx', 2.2);
+      ST.noteChange(this.state, t('n.liftLies', 'The lift does not go where the buttons say.'));
     }
     this.hud.say(`${label}.`, null, 'sfx', 1.8);
   }
 
   lookOutside() {
     const n = this.state.night;
-    const lines = [
-      'Rain on the glass, and behind it a city with almost no lights in it. Three windows burning in the whole northern district. You count them every night and it is always three.',
-      'The street below is empty and shining. No cars have moved on it since the outage. The puddles have not been disturbed by anything.',
-      'A window across the street lights up while you are watching, and goes out again, and lights up. Someone is signalling, or a fuse is failing. You cannot tell which and it matters.',
-      'The building opposite is closer than it was. Not much. Enough that you can see the pattern on somebody\'s curtains.',
-      'You cannot see the ground. There is a street down there and you have walked on it, and tonight the window shows you a courtyard you have never seen, with a chair in the middle of it.',
-      'Your own reflection is late. It arrives about a third of a second after you move, and it is watching the room rather than the street.',
-      'There is no city. There is rain, and there is the light from this window falling on rain, and beyond that the rain simply continues.',
-    ];
-    this.hud.say(lines[clamp(n, 1, 7) - 1], null, 'sfx', 6.5);
+    this.hud.say(t(`ui.window.${clamp(n, 1, 7)}`, WINDOW_EN[clamp(n, 1, 7) - 1]), null, 'sfx', 6.5);
     this.audio.play('wind', { volume: 0.1 });
     if (n >= 5) this.director.dread = clamp(this.director.dread + 0.12, 0, 1);
     if (n === 7) {
-      ST.addJournal(this.state, { cat: 'evidence', title: 'There is nothing outside the windows', text: 'No street. No opposite building. Rain, falling through the place where a city should be.' });
+      ST.addJournal(this.state, {
+        cat: 'evidence',
+        title: t('j.noCity.t', 'There is nothing outside the windows'),
+        text: t('j.noCity.x', 'No street. No opposite building. Rain, falling through the place where a city should be.'),
+      });
     }
   }
 
   lookInMirror() {
     const n = this.state.night;
-    const lines = [
-      'You look tired. That is all. It is a relief and you are embarrassed about how much of one.',
-      'You look tired. Behind you, the door of your own apartment is closed. You left it open.',
-      'You look tired, and slightly wrong, in the way of a photograph of yourself taken by somebody else.',
-      'Your reflection blinks first.',
-      'The room in the mirror has two plates on the table. The room you are standing in has one.',
-      'You are not in it. The room is, perfectly, down to the grain of the wallpaper. You are not.',
-      'It is a photograph now. Sepia, cracked, and it has been on this wall for a very long time, and you are in it, at the left edge, being scratched out with a pin.',
-    ];
-    this.hud.say(lines[clamp(n, 1, 7) - 1], null, 'sfx', 6.5);
+    this.hud.say(t(`ui.mirror.${clamp(n, 1, 7)}`, MIRROR_EN[clamp(n, 1, 7) - 1]), null, 'sfx', 6.5);
     this.audio.play(n >= 4 ? 'chime_bad' : 'click', { volume: 0.4 });
     if (n >= 4) this.director.dread = clamp(this.director.dread + 0.2, 0, 1);
-    if (n >= 6) ST.addJournal(this.state, { cat: 'events', title: 'The mirror has stopped including me', text: 'The room is reflected perfectly. I am not in it.' });
+    if (n >= 6) {
+      ST.addJournal(this.state, {
+        cat: 'events',
+        title: t('j.mirror.t', 'The mirror has stopped including me'),
+        text: t('j.mirror.x', 'The room is reflected perfectly. I am not in it.'),
+      });
+    }
   }
 
   tryNewDoor() {
@@ -1038,16 +1132,17 @@ class Game {
     this.audio.play('door_locked', { volume: 0.6 });
     if (!st.flags.knocked_newdoor) {
       ST.setFlag(st, 'knocked_newdoor');
-      this.hud.say('No handle. No keyhole. It is warm, and it does not move, and after a moment something on the other side knocks four times.', null, 'sfx', 6.5);
+      this.hud.say(t('x.knockedBack', 'No handle. No keyhole. It is warm, and it does not move, and after a moment something on the other side knocks four times.'), null, 'sfx', 6.5);
       this.audio.play('knock', { volume: 0.7, count: 4, delay: 1.6, pos: this.player.head.clone() });
       this.director.dread = clamp(this.director.dread + 0.3, 0, 1);
       ST.addJournal(st, {
-        cat: 'events', title: 'It knocked back',
-        text: 'I put my hand on the door with no number and something on the other side knocked four times. Mira says four is not allowed.',
+        cat: 'events',
+        title: t('j.knockBack.t', 'It knocked back'),
+        text: t('j.knockBack.x', 'I put my hand on the door with no number and something on the other side knocked four times. Mira says four is not allowed.'),
       });
       this.readDoc('door_plaque');
     } else {
-      this.hud.say('It is warm. It does not open. Not tonight.', null, 'sfx', 3.4);
+      this.hud.say(t('x.doorWarm', 'It is warm. It does not open. Not tonight.'), null, 'sfx', 3.4);
     }
   }
 
@@ -1068,12 +1163,16 @@ class Game {
     const st = this.state;
     if (!this.canLeaveByFront()) {
       this.audio.play('_rattle', { volume: 0.6 });
-      this.hud.say('Chained. You have never once tried lifting the hook, and you notice that you have never once tried, and then you do not try.', null, 'sfx', 6);
-      ST.addJournal(st, { cat: 'events', title: 'The chain on the front door', text: 'I stood in front of it and did not try it. I have never tried it. That is a strange thing to be certain of.' });
+      this.hud.say(t('x.chained', 'Chained. You have never once tried lifting the hook, and you notice that you have never once tried, and then you do not try.'), null, 'sfx', 6);
+      ST.addJournal(st, {
+        cat: 'events',
+        title: t('j.chain.t', 'The chain on the front door'),
+        text: t('j.chain.x', 'I stood in front of it and did not try it. I have never tried it. That is a strange thing to be certain of.'),
+      });
       return;
     }
     if (st.night < ST.MAX_NIGHT) {
-      this.hud.say('The hook is resting in the loop. It would lift off with one finger. — Not tonight. Not with this much still unfound.', null, 'sfx', 6);
+      this.hud.say(t('x.hookInLoop', 'The hook is resting in the loop. It would lift off with one finger. — Not tonight. Not with this much still unfound.'), null, 'sfx', 6);
       return;
     }
     this.audio.play('door_open', { volume: 0.7 });
@@ -1085,58 +1184,61 @@ class Game {
 
   useBench() {
     if (this.usedThisNight.has('bench')) {
-      this.hud.say('Tools, solder, three radios in pieces. Nothing here is broken and nothing here is finished.', null, 'sfx', 4);
+      this.hud.say(t('x.benchIdle', 'Tools, solder, three radios in pieces. Nothing here is broken and nothing here is finished.'), null, 'sfx', 4);
       return;
     }
     this.usedThisNight.add('bench');
     this.player.battery = 1;
     this.audio.play('click', { volume: 0.6 });
     this.audio.play('switch', { volume: 0.4, delay: 0.5 });
-    this.hud.toast('<b>Torch serviced.</b> Contacts cleaned, cell topped up.');
+    this.hud.toast(t('m.torchServiced', '<b>Torch serviced.</b> Contacts cleaned, cell topped up.'));
     ST.setFlag(this.state, 'torch_serviced');
   }
 
   openWasher(i) {
     const key = `washer${i}`;
-    if (this.usedThisNight.has(key)) { this.hud.say('Empty, and it smells of nothing at all.', null, 'sfx', 3); return; }
+    if (this.usedThisNight.has(key)) { this.hud.say(t('x.washerEmpty', 'Empty, and it smells of nothing at all.'), null, 'sfx', 3); return; }
     this.usedThisNight.add(key);
     this.audio.play('door_open', { volume: 0.4, rate: 1.4 });
     const rng = makeRng(`wash-${this.state.night}-${i}`);
     if (rng.chance(0.4)) {
       const it = rng.pick(['coin', 'battery', 'ring']);
       ST.addItem(this.state, it, 1);
-      this.hud.toast(`In the drum: <b>${esc(ITEMS[it].name)}</b>`);
-      if (it === 'ring') this.hud.say('A wedding ring, in a machine nobody has run since the power went.', null, 'sfx', 4.5);
+      this.hud.toast(t('m.inTheDrum', 'In the drum: <b>{name}</b>').replace('{name}', esc(ITEMS[it].name)));
+      if (it === 'ring') this.hud.say(t('x.washerRing', 'A wedding ring, in a machine nobody has run since the power went.'), null, 'sfx', 4.5);
     } else {
-      this.hud.say('A load of washing, wrung out and cold. Somebody put it in and never came back for it.', null, 'sfx', 4);
+      this.hud.say(t('x.washerLaundry', 'A load of washing, wrung out and cold. Somebody put it in and never came back for it.'), null, 'sfx', 4);
     }
   }
 
   openCabinet() {
     if (!ST.hasItem(this.state, 'key_office')) {
       this.audio.play('door_locked', { volume: 0.6 });
-      this.hud.say('Locked. Halvard keeps the key on a chain.', null, 'sfx', 3);
+      this.hud.say(t('x.cabinetLocked', 'Locked. Halvard keeps the key on a chain.'), null, 'sfx', 3);
       return;
     }
-    if (this.usedThisNight.has('cabinet')) { this.hud.say('Files, in order, going back further than the building should allow.', null, 'sfx', 3.4); return; }
+    if (this.usedThisNight.has('cabinet')) { this.hud.say(t('x.cabinetFiles', 'Files, in order, going back further than the building should allow.'), null, 'sfx', 3.4); return; }
     this.usedThisNight.add('cabinet');
     this.audio.play('paper', { volume: 0.6 });
     ST.addItem(this.state, 'note_tenant', 1);
     this.readDoc('note_tenant');
-    this.hud.toast('<b>Tenant List</b> taken from the cabinet.');
+    this.hud.toast(t('m.tenantListTaken', '<b>Tenant List</b> taken from the cabinet.'));
   }
 
   takeKeys() {
     if (ST.hasItem(this.state, 'key_office')) {
-      this.hud.say('An empty board with nine hooks and nine faded outlines.', null, 'sfx', 3);
+      this.hud.say(t('x.emptyBoard', 'An empty board with nine hooks and nine faded outlines.'), null, 'sfx', 3);
       return;
     }
     ST.addItem(this.state, 'key_office', 1);
+    // the ring is nine keys; two of them are worth naming
+    ST.addItem(this.state, 'key_401', 1);
+    ST.addItem(this.state, 'key_roof', 1);
     ST.setFlag(this.state, 'has_office_key');
     ST.setFlag(this.state, 'stole_keys');
     ST.addTrust(this.state, 'halvard', -2);
     this.audio.play('pickup', { volume: 0.7 });
-    this.hud.toast("<b>Caretaker's Key</b> — taken. He will notice.", 'warn');
+    this.hud.toast(t('m.tookKeys', "<b>Caretaker's Key</b> — taken. He will notice."), 'warn');
     this.state.choices.push('stole_keys');
     const rack = this.building.props.get('key_rack');
     if (rack) rack.visible = false;
@@ -1144,7 +1246,7 @@ class Game {
 
   fitFuse() {
     if (!ST.hasItem(this.state, 'fuse')) {
-      this.hud.say('A row of ceramic fuse holders, and one of them is empty and blackened.', null, 'sfx', 4);
+      this.hud.say(t('x.fuseRow', 'A row of ceramic fuse holders, and one of them is empty and blackened.'), null, 'sfx', 4);
       return;
     }
     ST.removeItem(this.state, 'fuse', 1);
@@ -1153,11 +1255,12 @@ class Game {
     for (const e of this.lights.emitters) {
       if (e.lv === -1) { e.on = true; e.broken = false; n++; }
     }
-    this.hud.toast(`<b>The basement lights come on.</b> ${n} of them.`);
+    this.hud.toast(t('m.basementLightsOn', '<b>The basement lights come on.</b> {n} of them.').replace('{n}', n));
     ST.setFlag(this.state, 'basement_lit');
     ST.addJournal(this.state, {
-      cat: 'events', title: 'The basement lights work',
-      text: 'One fuse. Eleven days of blackout and the basement lights come on off a fuse, and the grid is supposed to be dead.',
+      cat: 'events',
+      title: t('j.basementLit.t', 'The basement lights work'),
+      text: t('j.basementLit.x', 'One fuse. Eleven days of blackout and the basement lights come on off a fuse, and the grid is supposed to be dead.'),
     });
   }
 
@@ -1169,11 +1272,11 @@ class Game {
         if (c.isMesh && c.material.map) c.material = MAT.paper('photo:empty');
       });
       this.audio.play('chime_bad', { volume: 0.3 });
-      this.hud.say('It is a photograph of this room, taken from where you are standing. There is nobody in it. There was somebody in it a moment ago.', null, 'sfx', 6);
-      ST.noteChange(this.state, 'A picture changed while I was looking at it.');
+      this.hud.say(t('x.paintingChanged', 'It is a photograph of this room, taken from where you are standing. There is nobody in it. There was somebody in it a moment ago.'), null, 'sfx', 6);
+      ST.noteChange(this.state, t('n.pictureChanged', 'A picture changed while I was looking at it.'));
       this.director.dread = clamp(this.director.dread + 0.15, 0, 1);
     } else {
-      this.hud.say('A print of the building, from the street, in better weather than this city has had recently.', null, 'sfx', 4);
+      this.hud.say(t('x.paintingNormal', 'A print of the building, from the street, in better weather than this city has had recently.'), null, 'sfx', 4);
     }
   }
 
@@ -1195,7 +1298,7 @@ class Game {
     pick.mesh.position.z += (Math.random() - 0.5) * 1.8;
     pick.mesh.rotation.y += (Math.random() - 0.5) * 1.6;
     this.audio.play('creak', { pos: pick.mesh.position.clone(), volume: 0.3 });
-    ST.noteChange(this.state, 'Things are not where I left them.');
+    ST.noteChange(this.state, t('n.thingsMoved', 'Things are not where I left them.'));
   }
 
   observe(o) {
@@ -1216,10 +1319,11 @@ class Game {
     const st = this.state;
     ST.setFlag(st, 'ilse_vanished');
     ST.addJournal(st, {
-      cat: 'events', title: 'Ilse is not in 302',
-      text: 'She went to the kitchen. There is no kitchen door. The tea is still warm and her glasses are on the arm of the chair.',
+      cat: 'events',
+      title: t('j.ilseGone.t', 'Ilse is not in 302'),
+      text: t('j.ilseGone.x', 'She went to the kitchen. There is no kitchen door. The tea is still warm and her glasses are on the arm of the chair.'),
     });
-    this.hud.say('Somewhere above you, a conversation stops in the middle of a word.', null, 'sfx', 4.5);
+    this.hud.say(t('x.conversationStops', 'Somewhere above you, a conversation stops in the middle of a word.'), null, 'sfx', 4.5);
     this.audio.play('reverse_swell', { volume: 0.35, dur: 2 });
     // her photograph becomes findable
     const ph = this.building.props.get('ilse_photo');
@@ -1256,11 +1360,13 @@ class Game {
     if (fx.take) ST.removeItem(st, fx.take, 1);
     if (fx.give) {
       for (const id of fx.give) {
-        if (ST.addItem(st, id, 1)) this.hud.toast(`<b>${esc(ITEMS[id]?.name || id)}</b>`);
+        if (ST.addItem(st, id, 1)) this.hud.toast(`<b>${esc(ITEMS[id]?.name || id)}</b>`);   // item names are localised in the data
       }
     }
     if (fx.ev) {
-      if (ST.addEvidence(st, fx.ev)) this.hud.toast(`<b>Evidence.</b> ${esc(DOCS[fx.ev]?.title || fx.ev)}`, 'evidence');
+      if (ST.addEvidence(st, fx.ev)) {
+        this.hud.toast(t('m.evidence', '<b>Evidence.</b> {title}').replace('{title}', esc(DOCS[fx.ev]?.title || fx.ev)), 'evidence');
+      }
       if (!st.docsRead.includes(fx.ev)) st.docsRead.push(fx.ev);
     }
     if (fx.journal) ST.addJournal(st, fx.journal);
@@ -1278,21 +1384,21 @@ class Game {
     const def = ITEMS[id];
     if (!def?.use) return;
     if (def.use === 'reload') {
-      if (this.player.battery > 0.95) { this.hud.say('The cell in it is fine.', null, 'sfx', 2.4); return; }
+      if (this.player.battery > 0.95) { this.hud.say(t('m.cellIsFine', 'The cell in it is fine.'), null, 'sfx', 2.4); return; }
       ST.removeItem(st, id, 1);
       this.player.reload();
-      this.hud.toast('<b>Fresh cell.</b> The beam steadies.');
+      this.hud.toast(t('m.freshCell', '<b>Fresh cell.</b> The beam steadies.'));
     } else if (def.use === 'eat') {
       ST.removeItem(st, id, 1);
       st.food = clamp(st.food + 34, 0, 100);
       st.health = clamp(st.health + 4, 0, 100);
       this.audio.play('paper', { volume: 0.3 });
-      this.hud.toast('You eat, standing up, without tasting it.');
+      this.hud.toast(t('m.ate', 'You eat, standing up, without tasting it.'));
     } else if (def.use === 'heal') {
       ST.removeItem(st, id, 1);
       st.health = clamp(st.health + 32, 0, 100);
       this.audio.play('click', { volume: 0.4 });
-      this.hud.toast('The ache steps back a little.');
+      this.hud.toast(t('m.acheStepsBack', 'The ache steps back a little.'));
     }
     this.inventory.render();
   }
@@ -1301,7 +1407,7 @@ class Game {
     const st = this.state;
     const combo = COMBOS.find((c) => (c.a === a && c.b === b) || (c.a === b && c.b === a));
     if (!combo) {
-      this.hud.say('Those two do not go together.', null, 'sfx', 2.2);
+      this.hud.say(t('m.dontGoTogether', 'Those two do not go together.'), null, 'sfx', 2.2);
       return;
     }
     if (combo.out === 'reload') { this.useItem('battery'); return; }
@@ -1320,6 +1426,9 @@ class Game {
   currentTheory() {
     const n = this.state.evidence.length;
     if (n === 0) return null;
+    const tier = n < 3 ? 1 : n < 5 ? 2 : n < 7 ? 3 : n < 9 ? 4 : 5;
+    const sv = t(`ui.theory.${tier}`, null);
+    if (sv) return sv;
     if (n < 3) return 'Not enough yet. Noises, a photograph, an old newspaper. Any one of them is nothing. I am writing them down because Ilse told me to and because I have started to distrust my own recall.';
     if (n < 5) return 'Something happened in this building and everybody who is still here was here for it. The blackout is not the cause. The blackout is the condition under which it repeats.';
     if (n < 7) return 'A fire, eleven days into an outage. Seven dead, six recovered. The fire doors were held open with folded newspaper — deliberately, by a resident, in the middle of an ordinary evening.';
@@ -1328,6 +1437,8 @@ class Game {
   }
 
   locationNote(id) {
+    const tr = t(`ui.loc.${id}`, null);
+    if (tr) return tr;
     const notes = {
       lobby: 'The entrance hall. Mailboxes, a dead plant, a chained front door. The chain has never been locked.',
       laundry: 'Four machines, three of them with washing still in them, cold and wrung out.',
@@ -1344,7 +1455,7 @@ class Game {
       '403': 'My own apartment, under years of undisturbed dust.',
       '404': 'The records. Every tenancy since the building opened, and one file for a room that does not exist.',
     };
-    return notes[id] || 'Another room in a building that has more of them than it should.';
+    return notes[id] || t('ui.loc.generic', 'Another room in a building that has more of them than it should.');
   }
 
   // ══════════════════ input outside the world ══════════════════
@@ -1393,7 +1504,7 @@ class Game {
     }
     if (i.hitRaw('KeyF')) {
       const on = this.player.toggleTorch();
-      if (!on && this.player.battery <= 0) this.hud.toast('The cell is dead. You need a battery.', 'warn');
+      if (!on && this.player.battery <= 0) this.hud.toast(t('m.deadCell', 'The cell is dead. You need a battery.'), 'warn');
     }
     if (i.hitRaw('KeyT')) this.hud.peekWatch();
   }

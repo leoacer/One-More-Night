@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { clamp, damp } from '../core/util.js';
 
-const POOL = 7;
+const POOL_DEFAULT = 7;
 
 // three uses physical light units, so a bare bulb needs candela, not a
 // convenient small number. Emitters are authored on a 1-5 scale and scaled here.
@@ -18,12 +18,7 @@ export class LightRig {
     this.scene = scene;
     this.settings = settings;
     this.pool = [];
-    for (let i = 0; i < POOL; i++) {
-      const l = new THREE.PointLight(0xffffff, 0, 8, 1.8);
-      l.castShadow = false;
-      scene.add(l);
-      this.pool.push(l);
-    }
+    this.setPoolSize(POOL_DEFAULT);
     this.ambient = new THREE.HemisphereLight(0x59677c, 0x0d1114, 0.13);
     // 0 indoors, 1 on the roof. Outside, an overcast sky is the only light
     // there is, and it needs to be a great deal stronger than the indoor floor.
@@ -35,6 +30,18 @@ export class LightRig {
     this.blackout = 0;        // full kill, used on night 7
     this._sorted = [];
     this.onFlicker = null;
+  }
+
+  /** Grow or shrink the pool of real lights. Costs one shader recompile. */
+  setPoolSize(n) {
+    n = Math.max(3, Math.min(16, Math.round(n)));
+    while (this.pool.length > n) this.scene.remove(this.pool.pop());
+    while (this.pool.length < n) {
+      const l = new THREE.PointLight(0xffffff, 0, 8, 1.8);
+      l.castShadow = false;
+      this.scene.add(l);
+      this.pool.push(l);
+    }
   }
 
   setEmitters(list) {
@@ -121,7 +128,7 @@ export class LightRig {
     }
     this._sorted.sort((a, b) => a.d - b.d);
 
-    for (let i = 0; i < POOL; i++) {
+    for (let i = 0; i < this.pool.length; i++) {
       const slot = this._sorted[i];
       const l = this.pool[i];
       if (!slot) { l.intensity = 0; continue; }

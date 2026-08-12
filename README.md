@@ -108,6 +108,8 @@ src/
     postfx.js           bloom, grade, grain, vignette, reality distortion
     input.js            keyboard, pointer lock, persisted settings
     state.js            save/load, inventory, trust, evidence, journal
+    quality.js          the four quality tiers and what each one buys
+    i18n.js             localisation: one flat key→string map per language
     util.js             seeded rng, maths, dom
   world/
     layout.js           the building as data: levels, rooms, geometry constants
@@ -131,6 +133,7 @@ src/
     dialogue.js         all five residents, across all seven nights
     lore.js             every readable document in the building
     items.js            everything you can carry
+    locales/sv/         the Swedish pack, split by what it translates
 ```
 
 ### A few implementation notes
@@ -142,15 +145,33 @@ loads. Later nights layer more changes on: apartment numbers swap, doors are
 repainted, rooms lock and unlock, clutter moves while you are looking
 elsewhere.
 
-**Lighting** uses a pool of seven real point lights that are reassigned each
-frame to the nearest active emitters. Emissive bulb meshes stay visible at
-any range, so a lit room across the building still reads as lit without
-costing a light slot. Only the torch casts shadows.
+**Lighting** uses a small pool of real point lights — five to ten, depending
+on quality tier — reassigned each frame to the nearest active emitters.
+Emissive bulb meshes stay visible at any range, so a lit room across the
+building still reads as lit without costing a light slot. Only the torch
+casts shadows.
 
 **Audio** is synthesised from noise buffers and oscillators through
 `PannerNode`s with HRTF panning, so you can tell which side of you a door
 opened on. Convolution reverb is built from decaying noise — one short room,
 one long stairwell. Sounds are deliberately played behind you sometimes.
+
+**Quality tiers** (`Esc → Settings → Quality`) are Low, Medium, High and
+Ultra. Each tier sets render scale, shadow map size, how many real lights the
+pool holds, texture resolution and anisotropy, and how far bloom is
+downsampled. Ultra renders at 1.35× and regenerates every procedural texture
+at double size, so switching to it costs a moment while the canvases are
+redrawn; Low renders at 0.62× with five lights. Changing tier never needs a
+page reload.
+
+**Localisation** is patching, not duplication. The English data files stay
+the single source of structure, and a language pack is a flat map of
+key → string (`doc.<id>.b3`, `dlg.ilse.i1.o2`, `item.torch.desc`, `room.204.name`)
+that is written into those structures in place, with an English snapshot kept
+so switching back restores the originals. Any key a pack omits falls back to
+English one string at a time, so a partial translation never breaks the game.
+Swedish (`Svenska`) is complete: interface, all 34 documents, all seven night
+cards, every ending, every item, and all 635 lines of dialogue.
 
 **Horror design.** There are three loud moments in the whole game. The rest
 is silence, footsteps that stop when you stop, and objects that are not
@@ -164,8 +185,9 @@ if you ask her nicely.
 
 Settings (`Esc → Settings`) include mouse sensitivity and Y inversion, field
 of view, head-bob amount, film grain amount, master volume, brightness, a
-render-scale control for weaker GPUs, **captions for non-speech sounds**, and
-**reduce flashing**, which disables lamp flicker and lightning.
+quality tier for weaker GPUs, **language** (English / Svenska),
+**captions for non-speech sounds**, and **reduce flashing**, which disables
+lamp flicker and lightning.
 
 ---
 

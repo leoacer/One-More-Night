@@ -6,17 +6,23 @@
 import * as THREE from 'three';
 import { clamp, damp, makeRng } from '../core/util.js';
 import { levelY } from '../world/layout.js';
+import { t } from '../core/i18n.js';
 
 const AMBIENT = [
-  { s: 'creak', w: 3, sub: 'Something settles, one floor up.' },
-  { s: 'pipe_clank', w: 3, sub: 'A pipe knocks, somewhere in the wall.' },
+  { s: 'creak', w: 3, k: 's.settles', sub: 'Something settles, one floor up.' },
+  { s: 'pipe_clank', w: 3, k: 's.pipeKnocks', sub: 'A pipe knocks, somewhere in the wall.' },
   { s: 'drip', w: 4, sub: null },
-  { s: 'wood_groan', w: 2, sub: 'The building shifts its weight.' },
-  { s: 'drop', w: 1.2, sub: 'Something falls over in an empty room.' },
-  { s: 'door_close', w: 1.0, sub: 'A door closes, further away than it sounds.' },
-  { s: 'knock', w: 0.7, sub: 'Knocking. Three times. Not at your door.' },
-  { s: 'voices', w: 1.4, sub: 'Muffled conversation through a wall.' },
-  { s: 'footsteps', w: 1.6, sub: 'Footsteps on the stair above you.' },
+  { s: 'wood_groan', w: 2, k: 's.buildingShifts', sub: 'The building shifts its weight.' },
+  { s: 'drop', w: 1.2, k: 's.somethingFalls', sub: 'Something falls over in an empty room.' },
+  { s: 'door_close', w: 1.0, k: 's.doorCloses', sub: 'A door closes, further away than it sounds.' },
+  { s: 'knock', w: 0.7, k: 's.knockingFar', sub: 'Knocking. Three times. Not at your door.' },
+  { s: 'voices', w: 1.4, k: 's.muffledTalk', sub: 'Muffled conversation through a wall.' },
+  { s: 'footsteps', w: 1.6, k: 's.footstepsAbove', sub: 'Footsteps on the stair above you.' },
+];
+
+const WHISPERS = [
+  ['w.shutTheDoor', 'SHUT THE DOOR'], ['w.oneMore', 'ONE MORE'], ['w.seven', 'SEVEN'],
+  ['w.youAreLate', 'YOU ARE LATE'], ['w.again', 'AGAIN'],
 ];
 
 export class Director {
@@ -110,7 +116,7 @@ export class Director {
       for (const a of AMBIENT) { r -= a.w; if (r <= 0) { pick = a; break; } }
       const where = this.rng.pick(['above', 'below', 'far', 'wall', 'corridor', 'stairs', 'near']);
       this.fireSound(pick.s, where, player, camDir, { volume: 0.5 + this.rng.range(0, 0.35), dur: 3 });
-      if (pick.sub) g.hud.say(pick.sub, null, 'sfx', 2.6);
+      if (pick.sub) g.hud.say(t(pick.k, pick.sub), null, 'sfx', 2.6);
     }
 
     // ── weather
@@ -137,7 +143,7 @@ export class Director {
       this.whisperIn = 40 + this.rng.range(0, 60);
       if (this.dread > 0.35) {
         this.audio.playBehind('whisper', camDir, 2.4, { volume: 0.3 + this.dread * 0.3, dur: 1.6 });
-        if (this.dread > 0.7) g.hud.whisperText(this.rng.pick(['SHUT THE DOOR', 'ONE MORE', 'SEVEN', 'YOU ARE LATE', 'AGAIN']));
+        if (this.dread > 0.7) { const w = this.rng.pick(WHISPERS); g.hud.whisperText(t(w[0], w[1])); }
       }
     }
 
@@ -162,15 +168,15 @@ export class Director {
     switch (e.type) {
       case 'sfx':
         this.fireSound(e.sound, e.where, player, camDir, { volume: 0.62, dur: 2.4 });
-        if (e.sound === 'knock') g.hud.say('Knocking. Three times, unhurried.', null, 'sfx', 3);
+        if (e.sound === 'knock') g.hud.say(t('x.knocking', 'Knocking. Three times, unhurried.'), null, 'sfx', 3);
         break;
       case 'voices':
         this.audio.play('voices', { pos: this.posFor('wall', player, camDir), volume: 0.5, dur: 5 });
-        g.hud.say('Two people talking, on the other side of a wall that has no room behind it.', null, 'sfx', 4);
+        g.hud.say(t('x.voicesThroughWall', 'Two people talking, on the other side of a wall that has no room behind it.'), null, 'sfx', 4);
         break;
       case 'footsteps':
         this.fireSound('footsteps', e.where, player, camDir);
-        g.hud.say('Footsteps. They stop when you stop.', null, 'sfx', 3);
+        g.hud.say(t('x.footstepsStop', 'Footsteps. They stop when you stop.'), null, 'sfx', 3);
         break;
       case 'lights_dip':
         g.lights.triggerDip(1.6 + Math.random() * 2.2);

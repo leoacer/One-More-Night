@@ -8,6 +8,12 @@ import { mulberry32 } from './util.js';
 
 const cache = new Map();
 
+// Set from the quality tier. `scale` multiplies every generator's canvas
+// size, so it is part of the cache key.
+let texScale = 1;
+let anisotropy = 8;
+const sz = (base) => Math.max(64, Math.round(base * texScale));
+
 function makeCanvas(size) {
   const c = document.createElement('canvas');
   c.width = c.height = size;
@@ -104,7 +110,7 @@ function toTexture(canvas, repeat = [1, 1], srgb = true) {
   const t = new THREE.CanvasTexture(canvas);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(repeat[0], repeat[1]);
-  t.anisotropy = 8;
+  t.anisotropy = anisotropy;
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   t.needsUpdate = true;
   return t;
@@ -710,43 +716,44 @@ function genDrawing(kind, size = 256) {
 export const TX = {
   /** Get (and cache) a canvas by key. */
   canvas(key) {
-    if (cache.has(key)) return cache.get(key);
+    const ck = `${key}@${texScale}`;
+    if (cache.has(ck)) return cache.get(ck);
     let c;
     const [kind, arg] = key.split(':');
     switch (kind) {
-      case 'wallpaper': c = genWallpaper(parseInt(arg || '0', 10)); break;
-      case 'plaster': c = genPlaster(parseInt(arg || '1', 10)); break;
-      case 'plasterDark': c = genPlaster(parseInt(arg || '1', 10), 512, [66, 66, 64]); break;
-      case 'wood': c = genWoodFloor(parseInt(arg || '3', 10)); break;
-      case 'woodDark': c = genWoodFloor(parseInt(arg || '4', 10), 512, [60, 44, 32]); break;
-      case 'tile': c = genTile(parseInt(arg || '5', 10)); break;
-      case 'tileWhite': c = genTile(parseInt(arg || '6', 10), 512, '#6d6f68', '#565851'); break;
-      case 'carpet': c = genCarpet(parseInt(arg || '9', 10)); break;
-      case 'metal': c = genMetal(parseInt(arg || '11', 10)); break;
-      case 'metalDark': c = genMetal(parseInt(arg || '12', 10), 256, [48, 50, 52], 1.6); break;
-      case 'brass': c = genMetal(parseInt(arg || '13', 10), 256, [120, 100, 60], 0.5); break;
-      case 'door': c = genDoor(parseInt(arg || '21', 10)); break;
-      case 'doorGreen': c = genDoor(parseInt(arg || '22', 10), 512, [62, 76, 66]); break;
-      case 'doorBlue': c = genDoor(parseInt(arg || '23', 10), 512, [58, 68, 84]); break;
-      case 'doorRed': c = genDoor(parseInt(arg || '24', 10), 512, [92, 56, 50]); break;
-      case 'doorBlack': c = genDoor(parseInt(arg || '25', 10), 512, [26, 26, 28]); break;
-      case 'brick': c = genBrick(parseInt(arg || '31', 10)); break;
-      case 'ceiling': c = genCeiling(parseInt(arg || '41', 10)); break;
-      case 'news': c = genNewspaper(512, arg || 'BLACKOUT'); break;
-      case 'photo': c = genPhoto(256, arg || 'two'); break;
-      case 'graffiti': c = genGraffiti(arg || '...', 256); break;
-      case 'plate': c = genNumberPlate(arg || '000'); break;
-      case 'grime': c = genGrimeAlpha(parseInt(arg || '61', 10)); break;
-      case 'drawing': c = genDrawing(arg || 'building'); break;
+      case 'wallpaper': c = genWallpaper(parseInt(arg || '0', 10), sz(512)); break;
+      case 'plaster': c = genPlaster(parseInt(arg || '1', 10), sz(512)); break;
+      case 'plasterDark': c = genPlaster(parseInt(arg || '1', 10), sz(512), [66, 66, 64]); break;
+      case 'wood': c = genWoodFloor(parseInt(arg || '3', 10), sz(512)); break;
+      case 'woodDark': c = genWoodFloor(parseInt(arg || '4', 10), sz(512), [60, 44, 32]); break;
+      case 'tile': c = genTile(parseInt(arg || '5', 10), sz(512)); break;
+      case 'tileWhite': c = genTile(parseInt(arg || '6', 10), sz(512), '#6d6f68', '#565851'); break;
+      case 'carpet': c = genCarpet(parseInt(arg || '9', 10), sz(512)); break;
+      case 'metal': c = genMetal(parseInt(arg || '11', 10), sz(256)); break;
+      case 'metalDark': c = genMetal(parseInt(arg || '12', 10), sz(256), [48, 50, 52], 1.6); break;
+      case 'brass': c = genMetal(parseInt(arg || '13', 10), sz(256), [120, 100, 60], 0.5); break;
+      case 'door': c = genDoor(parseInt(arg || '21', 10), sz(512)); break;
+      case 'doorGreen': c = genDoor(parseInt(arg || '22', 10), sz(512), [62, 76, 66]); break;
+      case 'doorBlue': c = genDoor(parseInt(arg || '23', 10), sz(512), [58, 68, 84]); break;
+      case 'doorRed': c = genDoor(parseInt(arg || '24', 10), sz(512), [92, 56, 50]); break;
+      case 'doorBlack': c = genDoor(parseInt(arg || '25', 10), sz(512), [26, 26, 28]); break;
+      case 'brick': c = genBrick(parseInt(arg || '31', 10), sz(512)); break;
+      case 'ceiling': c = genCeiling(parseInt(arg || '41', 10), sz(512)); break;
+      case 'news': c = genNewspaper(sz(512), arg || 'BLACKOUT'); break;
+      case 'photo': c = genPhoto(sz(256), arg || 'two'); break;
+      case 'graffiti': c = genGraffiti(arg || '...', sz(256)); break;
+      case 'plate': c = genNumberPlate(arg || '000', sz(128)); break;
+      case 'grime': c = genGrimeAlpha(parseInt(arg || '61', 10), sz(256)); break;
+      case 'drawing': c = genDrawing(arg || 'building', sz(256)); break;
       default: c = genPlaster(1);
     }
-    cache.set(key, c);
+    cache.set(ck, c);
     return c;
   },
 
   /** Get (and cache) a THREE texture. */
   get(key, repeat = [1, 1]) {
-    const ck = `tex:${key}:${repeat[0]}:${repeat[1]}`;
+    const ck = `tex:${key}:${repeat[0]}:${repeat[1]}@${texScale}:${anisotropy}`;
     if (cache.has(ck)) return cache.get(ck);
     const t = toTexture(this.canvas(key), repeat);
     cache.set(ck, t);
@@ -755,13 +762,31 @@ export const TX = {
 
   /** Normal map derived from a colour texture. */
   normal(key, repeat = [1, 1], strength = 2) {
-    const ck = `nrm:${key}:${repeat[0]}:${repeat[1]}:${strength}`;
+    const ck = `nrm:${key}:${repeat[0]}:${repeat[1]}:${strength}@${texScale}:${anisotropy}`;
     if (cache.has(ck)) return cache.get(ck);
     const n = normalFromCanvas(this.canvas(key), strength);
     const t = toTexture(n, repeat, false);
     cache.set(ck, t);
     return t;
   },
+
+  /**
+   * Apply a quality tier. Returns true if the texture size changed, which
+   * means every cached canvas and material is stale and the world has to be
+   * rebuilt before the new size is visible.
+   */
+  setQuality(scale, aniso) {
+    const sizeChanged = scale !== texScale;
+    texScale = scale;
+    anisotropy = aniso;
+    if (sizeChanged) this.clear();
+    else {
+      for (const v of cache.values()) if (v && v.isTexture) { v.anisotropy = aniso; v.needsUpdate = true; }
+    }
+    return sizeChanged;
+  },
+
+  get scale() { return texScale; },
 
   dataURL(key) { return this.canvas(key).toDataURL('image/png'); },
 
