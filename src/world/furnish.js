@@ -156,25 +156,29 @@ const RECIPES = {
     lamp(b, room, y, bounds.x1 - 1.1, bounds.z0 + 1.1, { desk: true, onSurface: 0.79, intensity: 2.6, distance: 4.5, id: 'home_desk' });
     b.interact(dsk, { type: 'journal_desk' });
 
+    // Nothing solid goes in the strip between the front door and the middle
+    // of the room: x within ±1.0 of centre, z from the door back to cz + 0.4.
     const t = P.table(1.1, 0.75);
-    t.position.set(cx, y, cz + 1.6);
+    t.position.set(cx + 0.1, y, cz - 0.5);
     b.addMesh(lv, t, { solid: true });
-    const ch = P.chair(); ch.position.set(cx - 0.85, y, cz + 1.6); ch.rotation.y = Math.PI / 2;
+    const ch = P.chair(); ch.position.set(cx - 1.0, y, cz - 0.5); ch.rotation.y = Math.PI / 2;
     b.addMesh(lv, ch, { solid: true });
-    const ch2 = P.chair(); ch2.position.set(cx + 0.85, y, cz + 1.6); ch2.rotation.y = -Math.PI / 2;
+    const ch2 = P.chair(); ch2.position.set(cx + 1.2, y, cz - 0.5); ch2.rotation.y = -Math.PI / 2;
     b.addMesh(lv, ch2, { solid: true });
 
+    // kitchen run along the west wall, well clear of the doorway
     const cn = P.counter(2.0);
-    cn.position.set(bounds.x0 + 1.4, y, bounds.z1 - 0.5);
+    cn.position.set(bounds.x0 + 0.35, y, cz + 0.6);
+    cn.rotation.y = Math.PI / 2;
     b.addMesh(lv, cn, { solid: true });
     const fr = P.fridge(1.5);
-    fr.position.set(bounds.x0 + 2.9, y, bounds.z1 - 0.5);
-    fr.rotation.y = Math.PI;
+    fr.position.set(bounds.x0 + 0.36, y, bounds.z1 - 0.65);
+    fr.rotation.y = Math.PI / 2;
     b.addMesh(lv, fr, { solid: true });
     b.interact(fr, { type: 'larder' });
     const sk = P.sink(0.6);
-    sk.position.set(bounds.x0 + 0.7, y, bounds.z1 - 0.5);
-    sk.rotation.y = Math.PI;
+    sk.position.set(bounds.x0 + 0.35, y, cz - 0.9);
+    sk.rotation.y = Math.PI / 2;
     b.group(lv).add(sk);
 
     const sh = P.shelf(1.0, 1.8, true, 3);
@@ -183,7 +187,7 @@ const RECIPES = {
     b.addMesh(lv, sh, { solid: true });
 
     const rg = P.rug(2.2, 1.5, 0x453229);
-    rg.position.set(cx, y, cz + 1.2);
+    rg.position.set(cx + 0.1, y, cz - 0.4);
     b.group(lv).add(rg);
 
     const ar = P.armchair();
@@ -204,14 +208,15 @@ const RECIPES = {
     b.props.set('home_clock', cl);
 
     const mr = P.mirror(0.5, 0.8);
-    mr.position.set(bounds.x0 + 0.11, y + 1.5, bounds.z0 + 1.0);
+    mr.position.set(bounds.x0 + 0.11, y + 1.5, bounds.z1 - 1.15);
     mr.rotation.y = Math.PI / 2;
     b.group(lv).add(mr);
     b.interact(mr, { type: 'mirror' });
     b.props.set('home_mirror', mr);
 
     const hk = P.coatHooks();
-    hk.position.set(cx + 1.3, y + 1.7, bounds.z0 + 0.12);
+    hk.position.set(cx + 1.15, y + 1.7, bounds.z1 - 0.12);
+    hk.rotation.y = Math.PI;
     b.group(lv).add(hk);
 
     spawnItem(b, lv, 'battery', bounds.x1 - 1.1, y + 0.79, bounds.z0 + 0.85, { qty: 1 });
@@ -224,7 +229,7 @@ const RECIPES = {
     b.interact(drawer, { type: 'item', item: 'note_lease', doc: 'note_lease', label: 'Papers in the drawer' });
 
     // the frame of your own front door — searchable from inside
-    const frameMark = P.box(0.9, 0.06, 0.1, MAT.flat(0x3a3128, 0.9, 0.02), cx, y + 2.12, bounds.z0 + 0.14);
+    const frameMark = P.box(0.9, 0.06, 0.1, MAT.flat(0x3a3128, 0.9, 0.02), cx, y + 2.12, bounds.z1 - 0.14);
     b.group(lv).add(frameMark);
     b.interact(frameMark, { type: 'read', doc: 'frame_marks', label: 'Door frame' });
   },

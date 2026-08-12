@@ -343,7 +343,8 @@ class Game {
     // start beside your own bed
     const home = this.building.rooms.get(HOME_ID);
     const b = home ? home.bounds : slotBounds('s', 1);
-    this.player.teleport((b.x0 + b.x1) / 2 + 1.4, levelY(1), (b.z0 + b.z1) / 2 - 0.6, Math.PI * 0.9);
+    // on the door's axis, facing it: walking straight forward gets you out
+    this.player.teleport((b.x0 + b.x1) / 2, levelY(1), (b.z0 + b.z1) / 2 + 0.9, Math.PI);
     this.building.setVisibleLevels(1);
     this.camera.updateMatrixWorld();
   }
@@ -550,6 +551,7 @@ class Game {
 
     // ── systems
     this.building.setVisibleLevels(lv);
+    for (const d of this.building.doors.values()) d.update(dt);
     this.elevator.update(dt, this.player.pos);
     // on the roof the overcast sky is the only real light there is
     this.lights.skyMix = damp(this.lights.skyMix, lv === ROOF_LEVEL ? 1 : 0, 2.6, dt);
